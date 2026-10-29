@@ -44,4 +44,6 @@
     <string name="note_gemma4_q8">A veces inventa frases. Habla con \"vos\". Muy lento con 8 GB de RAM.</string>
     <string name="note_gemma4">A veces inventa frases. Habla con \"vos\".</string>
     <string name="note_gemma1">Traduce mal e inventa. Habla con \"vos\".</string>
+    <string name="downloads_channel">Descargas de modelos</string>
+    <string name="downloads_title">Bajando %d modelos</string>
 </resources>

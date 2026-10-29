@@ -166,7 +166,15 @@ public class ModelsActivity extends Activity {
         texts.addView(Ui.text(this, mb(m.size) + " · " + getString(m.note), 13, Ui.MUTED, false));
         head.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (downloading) head.addView(button(R.string.cancel, () -> Models.cancel(m)));
-        else if (!have) head.addView(button(R.string.download, () -> { Models.download(this, m); render(); }));
+        else if (!have) head.addView(button(R.string.download, () -> {
+            // the progress notification needs this permission (the download works without it)
+            if (android.os.Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 2);
+            }
+            Models.download(this, m);
+            render();
+        }));
         else if (!selected) head.addView(button(R.string.delete, () -> { Models.delete(this, m); render(); }));
         box.addView(head);
 

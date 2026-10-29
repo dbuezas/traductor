@@ -45,4 +45,6 @@
     <string name="note_gemma4_q8">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\"). Very slow with 8 GB of RAM.</string>
     <string name="note_gemma4">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\").</string>
     <string name="note_gemma1">Translates badly and makes things up. Speaks Rioplatense Spanish (\"vos\").</string>
+    <string name="downloads_channel">Model downloads</string>
+    <string name="downloads_title">Downloading %d models</string>
 </resources>

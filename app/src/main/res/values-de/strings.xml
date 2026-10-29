@@ -44,4 +44,6 @@
     <string name="note_gemma4_q8">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\"). Sehr langsam mit 8 GB RAM.</string>
     <string name="note_gemma4">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\").</string>
     <string name="note_gemma1">Übersetzt schlecht und erfindet. Spricht argentinisches Spanisch (\"vos\").</string>
+    <string name="downloads_channel">Modell-Downloads</string>
+    <string name="downloads_title">Lade %d Modelle</string>
 </resources>

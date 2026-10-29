@@ -44,4 +44,6 @@
     <string name="note_gemma4_q8">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\"). Erg traag met 8 GB RAM.</string>
     <string name="note_gemma4">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\").</string>
     <string name="note_gemma1">Vertaalt slecht en verzint. Spreekt Argentijns Spaans (\"vos\").</string>
+    <string name="downloads_channel">Modeldownloads</string>
+    <string name="downloads_title">%d modellen downloaden</string>
 </resources>

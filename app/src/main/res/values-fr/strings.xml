@@ -44,4 +44,6 @@
     <string name="note_gemma4_q8">Invente parfois des phrases. Parle l\'espagnol d\'Argentine (\"vos\"). Très lent avec 8 Go de RAM.</string>
     <string name="note_gemma4">Invente parfois des phrases. Parle l\'espagnol d\'Argentine (\"vos\").</string>
     <string name="note_gemma1">Traduit mal et invente. Parle l\'espagnol d\'Argentine (\"vos\").</string>
+    <string name="downloads_channel">Téléchargements de modèles</string>
+    <string name="downloads_title">Téléchargement de %d modèles</string>
 </resources>

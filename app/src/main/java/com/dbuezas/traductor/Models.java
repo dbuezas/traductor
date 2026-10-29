@@ -133,7 +133,15 @@ final class Models {
     static final Map<String, Long> progress = new HashMap<>();   // bytes so far, only while downloading
     static final Map<String, String> errors = new HashMap<>();
     private static final Map<String, Thread> running = new HashMap<>();
-    static Progress listener;
+    static Progress listener;          // the settings screen
+    static Progress serviceListener;   // DownloadService's notification
+
+    /** Downloads running now. */
+    static synchronized java.util.List<Model> downloading() {
+        java.util.List<Model> out = new java.util.ArrayList<>();
+        for (Model m : ALL) if (running.containsKey(m.id)) out.add(m);
+        return out;
+    }
 
     static synchronized boolean isDownloading(Model m) {
         return running.containsKey(m.id);
@@ -185,6 +193,8 @@ final class Models {
         running.put(m.id, t);
         progress.put(m.id, new File(dir(app), m.id + ".part").length());
         t.start();
+        // keeps the app alive while downloading, also in the background or with the screen off
+        app.startForegroundService(new android.content.Intent(app, DownloadService.class));
     }
 
     private static void report(Model m, long bytes) {
@@ -193,6 +203,8 @@ final class Models {
         }
         Progress l = listener;
         if (l != null) l.update(m, bytes < 0);
+        Progress sl = serviceListener;
+        if (sl != null) sl.update(m, bytes < 0);
     }
 
     static synchronized void cancel(Model m) {
