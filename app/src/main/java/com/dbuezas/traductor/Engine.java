@@ -71,7 +71,8 @@ final class Engine {
     }
 
     interface Listener {
-        void onStatus(String status);
+        /** A status line: a string resource and its format arguments. */
+        void onStatus(int text, Object... args);
 
         /** Mic level 0..1 every 100 ms while listening; speaking: voice detected right now. */
         void onLevel(float level, boolean speaking);
@@ -245,11 +246,12 @@ final class Engine {
             }
         } catch (java.io.IOException e) {
             s.active = false;
-            listener.onStatus("Error: " + e.getMessage());
+            listener.onStatus(R.string.status_error, e.getMessage());
             return;
         }
-        listener.onStatus(s.wav != null ? "Probando con " + s.wav.getName() + "…"
-                : s.turn != null ? "Hablando en " + s.turn.label + "…" : "Escuchando…");
+        if (s.wav != null) listener.onStatus(R.string.status_testing, s.wav.getName());
+        else if (s.turn != null) listener.onStatus(R.string.status_speaking_in, s.turn.label);
+        else listener.onStatus(R.string.status_listening);
 
         ArrayDeque<float[]> preroll = new ArrayDeque<>();
         FloatBuf buf = null;           // current utterance
@@ -383,8 +385,8 @@ final class Engine {
             s.active = false;
             if (utt != null) discard(utt);   // stopped in the middle of it
             listener.onLevel(0, false);
-            if (s.turn != null && !s.cancelled) listener.onStatus("Traduciendo…");
-            else if (s.cancelled) listener.onStatus("Micrófono apagado");
+            if (s.turn != null && !s.cancelled) listener.onStatus(R.string.status_translating);
+            else if (s.cancelled) listener.onStatus(R.string.status_mic_off);
         }
     }
 
@@ -529,7 +531,7 @@ final class Engine {
                 run(job);
             } catch (Throwable t) {
                 Log.e(TAG, "job failed", t);
-                listener.onStatus("Error: " + t.getMessage());
+                listener.onStatus(R.string.status_error, String.valueOf(t.getMessage()));
             }
             synchronized (this) {
                 busy = false;
@@ -544,17 +546,17 @@ final class Engine {
             case "load": {
                 File w = (File) job[1], live = (File) job[2], t = (File) job[3];
                 if (w != null) {
-                    listener.onStatus("Cargando Whisper…");
+                    listener.onStatus(R.string.status_loading_whisper);
                     whisperReady = Native.loadWhisper(Native.MAIN, w.getAbsolutePath());
                 }
                 if (t != null) {
-                    listener.onStatus("Cargando traductor…");
+                    listener.onStatus(R.string.status_loading_translator);
                     generalTranslator = (Boolean) job[4];
                     translatorReady = Native.loadTranslator(t.getAbsolutePath());
                 }
                 if (translatorReady) enqueueFinal(new Object[]{"prepare"});   // in the background, see offerPartial
-                listener.onStatus(isReady() ? (isListening() ? "Escuchando…" : "Listo. Tocá el micrófono.")
-                        : "Faltan modelos: tocá ⚙");
+                if (isReady()) listener.onStatus(isListening() ? R.string.status_listening : R.string.status_ready);
+                else listener.onStatus(R.string.status_missing_models);
                 break;
             }
             case "unload-live":
@@ -814,7 +816,7 @@ final class Engine {
         if (!u.ended || u.spoken || u.translations.size() < u.pieces.size()) return;
         u.spoken = true;
         listener.onTranslated(u);
-        if (!isListening()) listener.onStatus("Listo");
+        if (!isListening()) listener.onStatus(R.string.status_ready);
     }
 
     /** Reads the translator's fixed instructions for both directions now, not on the first phrase. */

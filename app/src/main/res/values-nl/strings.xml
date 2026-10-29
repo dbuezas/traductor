@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_error">Fout: %s</string>
+    <string name="status_testing">Test met %s…</string>
+    <string name="status_speaking_in">Spreekt %s…</string>
+    <string name="status_translating">Vertalen…</string>
+    <string name="status_mic_off">Microfoon uit</string>
+    <string name="status_loading_whisper">Whisper laden…</string>
+    <string name="status_loading_translator">Vertaler laden…</string>
+    <string name="status_listening">Luistert…</string>
+    <string name="status_ready">Klaar</string>
+    <string name="status_missing_models">Modellen ontbreken: tik op ⚙</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_turns">Om de beurt</string>
+    <string name="settings_title">Instellingen</string>
+    <string name="section_listen">Luisteren (Whisper)</string>
+    <string name="section_translate">Vertalen</string>
+    <string name="section_voices">Stemmen</string>
+    <string name="settings_note">Van beste naar slechtste. Nauwkeurigheid en snelheid zijn mijn schatting op een Pixel 7. Modellen worden één keer van Hugging Face gedownload; daarna werkt alles offline.</string>
+    <string name="choose_model">Kies een model</string>
+    <string name="choose_model_hint">Tik om de opties te zien en er een te downloaden.</string>
+    <string name="download">Downloaden</string>
+    <string name="cancel">Annuleren</string>
+    <string name="delete">Verwijderen</string>
+    <string name="error">Fout: %s</string>
+    <string name="voices_none">Geen stemmen geïnstalleerd</string>
+    <string name="voice_auto">Automatisch</string>
+    <string name="voices_count">%d stemmen</string>
+    <string name="voice_label">Stem %d</string>
+    <string name="voice_needs_internet">heeft internet nodig</string>
+    <string name="precision">Nauwkeurigheid</string>
+    <string name="speed">Snelheid</string>
+    <string name="bytes_of">%1$s van %2$s</string>
+    <string name="err_wrong_size">verkeerde grootte</string>
+    <string name="err_cannot_save">kon het bestand niet opslaan</string>
+    <string name="note_whisper_turbo">Begrijpt het best.</string>
+    <string name="note_whisper_medium">Trager dan turbo.</string>
+    <string name="note_whisper_small">Begrijpt slechter.</string>
+    <string name="note_whisper_base">Alleen voor eenvoudige zinnen.</string>
+    <string name="note_tg_q8">Verliesvrij. Erg traag met 8 GB RAM.</string>
+    <string name="note_tg_q6">Bijna verliesvrij. Gebruikt veel geheugen.</string>
+    <string name="note_tg_faithful">Trouw, verzint niets.</string>
+    <string name="note_tg_q3">Lichter, vertaalt iets slechter.</string>
+    <string name="note_gemma4_q8">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\"). Erg traag met 8 GB RAM.</string>
+    <string name="note_gemma4">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\").</string>
+    <string name="note_gemma1">Vertaalt slecht en verzint. Spreekt Argentijns Spaans (\"vos\").</string>
+</resources>

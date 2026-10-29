@@ -10,11 +10,13 @@ and hears the other person's words translated aloud. Everything runs on the phon
 - Text to speech: the phone's own voices
 
 I built it to talk with family in German and Spanish; it also has English, French, Italian,
-Portuguese and Dutch.
+Portuguese and Dutch. Each half of the screen talks to its reader in that half's language; the
+rest of the interface follows the phone's language.
 
 ## Using it
 
-1. Install the APK (from the [Actions](../../actions) build artifacts, or build it yourself).
+1. Install the APK from [Releases](../../releases/latest) (or build it yourself). Each push to
+   `main` makes a new release, and newer ones install as updates.
 2. Open ⚙ and download a Whisper model and a translator. They come from Hugging Face once;
    after that no internet is needed.
 3. Pick the two languages with the chips at the top of each half.
@@ -63,7 +65,9 @@ cd traductor
 ```
 
 Needs JDK 17 and the Android SDK with NDK 29.0.14206865 and CMake 4.1.2 (see
-`.github/workflows/build.yml`). The APK is arm64 only and signed with the standard debug key.
+`.github/workflows/build.yml`). The APK is arm64 only. It is signed with the app's key when
+`~/.android/traductor-release.jks` (or `TRADUCTOR_KEYSTORE`) is there, else with the standard
+debug key; a debug-signed build cannot update a release install.
 
 `tools/install.sh` builds and installs on a connected phone. `tools/replay-wav.sh file.wav` plays
 a 16 kHz WAV through the app instead of the mic and prints the log, which is how I test it.

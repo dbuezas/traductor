@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI texts in the phone's language. The words on each half of the screen follow that half's language instead (Lang.java). -->
+    <string name="status_error">Error: %s</string>
+    <string name="status_testing">Testing with %s…</string>
+    <string name="status_speaking_in">Speaking %s…</string>
+    <string name="status_translating">Translating…</string>
+    <string name="status_mic_off">Microphone off</string>
+    <string name="status_loading_whisper">Loading Whisper…</string>
+    <string name="status_loading_translator">Loading translator…</string>
+    <string name="status_listening">Listening…</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_missing_models">Models missing: tap ⚙</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_turns">Turns</string>
+    <string name="settings_title">Settings</string>
+    <string name="section_listen">Listen (Whisper)</string>
+    <string name="section_translate">Translate</string>
+    <string name="section_voices">Voices</string>
+    <string name="settings_note">Sorted from best to worst. Precision and speed are my own estimate on a Pixel 7. Models are downloaded from Hugging Face once; after that everything works offline.</string>
+    <string name="choose_model">Choose a model</string>
+    <string name="choose_model_hint">Tap to see the options and download one.</string>
+    <string name="download">Download</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="error">Error: %s</string>
+    <string name="voices_none">No voices installed</string>
+    <string name="voice_auto">Automatic</string>
+    <string name="voices_count">%d voices</string>
+    <string name="voice_label">Voice %d</string>
+    <string name="voice_needs_internet">needs internet</string>
+    <string name="precision">Precision</string>
+    <string name="speed">Speed</string>
+    <string name="bytes_of">%1$s of %2$s</string>
+    <string name="err_wrong_size">wrong size</string>
+    <string name="err_cannot_save">could not save the file</string>
+    <string name="note_whisper_turbo">Understands best.</string>
+    <string name="note_whisper_medium">Slower than turbo.</string>
+    <string name="note_whisper_small">Understands worse.</string>
+    <string name="note_whisper_base">Only for simple sentences.</string>
+    <string name="note_tg_q8">Lossless. Very slow on phones with 8 GB of RAM.</string>
+    <string name="note_tg_q6">Almost lossless. Uses a lot of memory.</string>
+    <string name="note_tg_faithful">Faithful, does not make things up.</string>
+    <string name="note_tg_q3">Lighter, translates a bit worse.</string>
+    <string name="note_gemma4_q8">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\"). Very slow with 8 GB of RAM.</string>
+    <string name="note_gemma4">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\").</string>
+    <string name="note_gemma1">Translates badly and makes things up. Speaks Rioplatense Spanish (\"vos\").</string>
+</resources>

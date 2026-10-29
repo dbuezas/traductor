@@ -78,7 +78,7 @@ public class ModelsActivity extends Activity {
         Long got = Models.progress.get(m.id);
         long bytes = got == null ? 0 : got;
         ((ProgressBar) v[0]).setProgress((int) (bytes * 1000 / m.size));
-        ((TextView) v[1]).setText(mb(bytes) + " de " + mb(m.size));
+        ((TextView) v[1]).setText(getString(R.string.bytes_of, mb(bytes), mb(m.size)));
     }
 
     private final java.util.Set<Models.Kind> open = new java.util.HashSet<>();   // sections showing all options
@@ -86,14 +86,14 @@ public class ModelsActivity extends Activity {
     private void render() {
         list.removeAllViews();
         progressViews.clear();
-        list.addView(text("Ajustes", 28));
-        title("Escuchar (Whisper)");
+        list.addView(text(getString(R.string.settings_title), 28));
+        title(getString(R.string.section_listen));
         section(Models.Kind.WHISPER);
-        title("Traducir");
+        title(getString(R.string.section_translate));
         section(Models.Kind.TRANSLATOR);
-        title("Voces");
+        title(getString(R.string.section_voices));
         for (Lang l : Voices.langsInUse(this)) voiceRow(l);
-        TextView note = text("Ordenados de mejor a peor. Precisión y velocidad son una estimación mía en un Pixel 7. Los modelos se bajan de Hugging Face una sola vez; después todo anda sin internet.", 14);
+        TextView note = text(getString(R.string.settings_note), 14);
         note.setTextColor(Ui.MUTED);
         note.setPadding(dp(4), dp(24), dp(4), 0);
         list.addView(note);
@@ -121,9 +121,9 @@ public class ModelsActivity extends Activity {
         });
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.addView(Ui.text(this, sel != null ? sel.label : "Elegí un modelo", 17, Ui.TEXT, true));
+        texts.addView(Ui.text(this, sel != null ? sel.label : getString(R.string.choose_model), 17, Ui.TEXT, true));
         if (sel != null) texts.addView(ratings(sel));
-        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + " · " + sel.note : "Tocá para ver las opciones y bajar uno.", 14, Ui.MUTED, false));
+        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + " · " + getString(sel.note) : getString(R.string.choose_model_hint), 14, Ui.MUTED, false));
         box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         box.addView(Ui.text(this, expanded ? "▴" : "▾", 22, Ui.MUTED, false));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -163,15 +163,15 @@ public class ModelsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(Ui.text(this, (selected ? "✓  " : "") + m.label, 16, selected ? Ui.A_DARK : Ui.TEXT, true));
         texts.addView(ratings(m));
-        texts.addView(Ui.text(this, mb(m.size) + " · " + m.note, 13, Ui.MUTED, false));
+        texts.addView(Ui.text(this, mb(m.size) + " · " + getString(m.note), 13, Ui.MUTED, false));
         head.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
-        if (downloading) head.addView(button("Cancelar", () -> Models.cancel(m)));
-        else if (!have) head.addView(button("Bajar", () -> { Models.download(this, m); render(); }));
-        else if (!selected) head.addView(button("Borrar", () -> { Models.delete(this, m); render(); }));
+        if (downloading) head.addView(button(R.string.cancel, () -> Models.cancel(m)));
+        else if (!have) head.addView(button(R.string.download, () -> { Models.download(this, m); render(); }));
+        else if (!selected) head.addView(button(R.string.delete, () -> { Models.delete(this, m); render(); }));
         box.addView(head);
 
         String err = Models.errors.get(m.id);
-        if (err != null) box.addView(Ui.text(this, "Error: " + err, 13, Ui.RED, false));
+        if (err != null) box.addView(Ui.text(this, getString(R.string.error, err), 13, Ui.RED, false));
         if (downloading) {
             ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
             bar.setMax(1000);
@@ -202,9 +202,9 @@ public class ModelsActivity extends Activity {
         String chosen = Voices.chosen(this, l);
         int index = -1;
         for (int i = 0; i < voices.size(); i++) if (voices.get(i).getName().equals(chosen)) index = i;
-        String current = !ttsReady ? "…" : voices.isEmpty() ? "No hay voces instaladas"
-                : index < 0 ? "Automática" : Voices.label(voices.get(index), index);
-        texts.addView(Ui.text(this, current + (voices.isEmpty() ? "" : " · " + voices.size() + " voces"), 14, Ui.MUTED, false));
+        String current = !ttsReady ? "…" : voices.isEmpty() ? getString(R.string.voices_none)
+                : index < 0 ? getString(R.string.voice_auto) : Voices.label(this, voices.get(index), index);
+        texts.addView(Ui.text(this, current + (voices.isEmpty() ? "" : " · " + getString(R.string.voices_count, voices.size())), 14, Ui.MUTED, false));
         box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (!voices.isEmpty()) {   // tapping the card picks the voice
             box.setBackground(Ui.ripple(card, Ui.dark ? 0x22FFFFFF : 0x22000000));
@@ -216,8 +216,8 @@ public class ModelsActivity extends Activity {
 
     private void pickVoice(Lang l, List<Voice> voices) {
         String[] labels = new String[voices.size() + 1];
-        labels[0] = "Automática";
-        for (int i = 0; i < voices.size(); i++) labels[i + 1] = Voices.label(voices.get(i), i);
+        labels[0] = getString(R.string.voice_auto);
+        for (int i = 0; i < voices.size(); i++) labels[i + 1] = Voices.label(this, voices.get(i), i);
         new AlertDialog.Builder(this, Ui.dialogTheme())
                 .setTitle(l.flag + "  " + l.label)
                 .setItems(labels, (d, i) -> {
@@ -241,7 +241,7 @@ public class ModelsActivity extends Activity {
 
     /** "Precisión ●●●●○   Velocidad ●●●○○" */
     private TextView ratings(Models.Model m) {
-        TextView t = Ui.text(this, "Precisión " + dots(m.precision) + "    Velocidad " + dots(m.speed), 13, Ui.MUTED, true);
+        TextView t = Ui.text(this, getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed), 13, Ui.MUTED, true);
         t.setPadding(0, dp(3), 0, dp(1));
         return t;
     }
@@ -254,10 +254,10 @@ public class ModelsActivity extends Activity {
         return Ui.text(this, s, sp, Ui.TEXT, false);
     }
 
-    private View button(String label, Runnable r) {
-        boolean danger = label.equals("Borrar") || label.equals("Cancelar");
-        boolean primary = label.equals("Bajar");
-        TextView b = Ui.pill(this, label, primary ? Ui.A : danger ? (Ui.dark ? 0xFF3B1414 : 0xFFFEE2E2) : Ui.BG,
+    private View button(int label, Runnable r) {
+        boolean danger = label == R.string.delete || label == R.string.cancel;
+        boolean primary = label == R.string.download;
+        TextView b = Ui.pill(this, getString(label), primary ? Ui.A : danger ? (Ui.dark ? 0xFF3B1414 : 0xFFFEE2E2) : Ui.BG,
                 primary ? Ui.WHITE : danger ? Ui.RED : Ui.TEXT);
         b.setOnClickListener(v -> r.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);

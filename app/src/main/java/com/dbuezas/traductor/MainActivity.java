@@ -431,8 +431,8 @@ public class MainActivity extends Activity implements Engine.Listener {
         LinearLayout seg = new LinearLayout(this);
         seg.setPadding(dp(3), dp(3), dp(3), dp(3));
         seg.setBackground(Ui.round(Ui.BG, dp(100)));
-        modeAuto = Ui.pill(this, "Auto", Ui.BG, Ui.MUTED);
-        modeTurns = Ui.pill(this, "Turnos", Ui.BG, Ui.MUTED);
+        modeAuto = Ui.pill(this, getString(R.string.mode_auto), Ui.BG, Ui.MUTED);
+        modeTurns = Ui.pill(this, getString(R.string.mode_turns), Ui.BG, Ui.MUTED);
         modeAuto.setOnClickListener(v -> setTurnMode(false));
         modeTurns.setOnClickListener(v -> setTurnMode(true));
         seg.addView(modeAuto);
@@ -549,7 +549,7 @@ public class MainActivity extends Activity implements Engine.Listener {
         loadedWhisper = ws;
         loadedLive = ls;
         loadedTranslator = ts;
-        if (ws == null || ts == null) status.setText("Faltan modelos: tocá ⚙");
+        if (ws == null || ts == null) status.setText(R.string.status_missing_models);
     }
 
     @Override
@@ -700,9 +700,9 @@ public class MainActivity extends Activity implements Engine.Listener {
     // ---- Engine.Listener (called from background threads) ----
 
     @Override
-    public void onStatus(String s) {
+    public void onStatus(int text, Object... args) {
         ui.post(() -> {
-            lastStatus = turnMode && s.startsWith("Listo") ? "Listo" : s;
+            lastStatus = getString(text, args);
             status.setText(lastStatus);
             refreshStates();
         });

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_error">Errore: %s</string>
+    <string name="status_testing">Test con %s…</string>
+    <string name="status_speaking_in">Parla in %s…</string>
+    <string name="status_translating">Traduco…</string>
+    <string name="status_mic_off">Microfono spento</string>
+    <string name="status_loading_whisper">Carico Whisper…</string>
+    <string name="status_loading_translator">Carico il traduttore…</string>
+    <string name="status_listening">In ascolto…</string>
+    <string name="status_ready">Pronto</string>
+    <string name="status_missing_models">Mancano i modelli: tocca ⚙</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_turns">A turno</string>
+    <string name="settings_title">Impostazioni</string>
+    <string name="section_listen">Ascoltare (Whisper)</string>
+    <string name="section_translate">Tradurre</string>
+    <string name="section_voices">Voci</string>
+    <string name="settings_note">Dal migliore al peggiore. Precisione e velocità sono una mia stima su un Pixel 7. I modelli si scaricano una volta da Hugging Face; poi tutto funziona offline.</string>
+    <string name="choose_model">Scegli un modello</string>
+    <string name="choose_model_hint">Tocca per vedere le opzioni e scaricarne uno.</string>
+    <string name="download">Scarica</string>
+    <string name="cancel">Annulla</string>
+    <string name="delete">Elimina</string>
+    <string name="error">Errore: %s</string>
+    <string name="voices_none">Nessuna voce installata</string>
+    <string name="voice_auto">Automatica</string>
+    <string name="voices_count">%d voci</string>
+    <string name="voice_label">Voce %d</string>
+    <string name="voice_needs_internet">richiede internet</string>
+    <string name="precision">Precisione</string>
+    <string name="speed">Velocità</string>
+    <string name="bytes_of">%1$s di %2$s</string>
+    <string name="err_wrong_size">dimensione errata</string>
+    <string name="err_cannot_save">impossibile salvare il file</string>
+    <string name="note_whisper_turbo">Quello che capisce meglio.</string>
+    <string name="note_whisper_medium">Più lento di turbo.</string>
+    <string name="note_whisper_small">Capisce peggio.</string>
+    <string name="note_whisper_base">Solo per frasi semplici.</string>
+    <string name="note_tg_q8">Senza perdite. Molto lento con 8 GB di RAM.</string>
+    <string name="note_tg_q6">Quasi senza perdite. Usa molta memoria.</string>
+    <string name="note_tg_faithful">Fedele, non inventa.</string>
+    <string name="note_tg_q3">Più leggero, traduce un po\' peggio.</string>
+    <string name="note_gemma4_q8">A volte inventa frasi. Parla spagnolo argentino (\"vos\"). Molto lento con 8 GB di RAM.</string>
+    <string name="note_gemma4">A volte inventa frasi. Parla spagnolo argentino (\"vos\").</string>
+    <string name="note_gemma1">Traduce male e inventa. Parla spagnolo argentino (\"vos\").</string>
+</resources>

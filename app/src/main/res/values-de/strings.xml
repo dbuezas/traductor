@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_error">Fehler: %s</string>
+    <string name="status_testing">Test mit %s…</string>
+    <string name="status_speaking_in">Spricht %s…</string>
+    <string name="status_translating">Übersetzt…</string>
+    <string name="status_mic_off">Mikrofon aus</string>
+    <string name="status_loading_whisper">Whisper wird geladen…</string>
+    <string name="status_loading_translator">Übersetzer wird geladen…</string>
+    <string name="status_listening">Hört zu…</string>
+    <string name="status_ready">Bereit</string>
+    <string name="status_missing_models">Modelle fehlen: ⚙ tippen</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_turns">Abwechselnd</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="section_listen">Zuhören (Whisper)</string>
+    <string name="section_translate">Übersetzen</string>
+    <string name="section_voices">Stimmen</string>
+    <string name="settings_note">Vom besten zum schlechtesten sortiert. Genauigkeit und Geschwindigkeit sind meine Schätzung auf einem Pixel 7. Die Modelle werden einmal von Hugging Face geladen; danach funktioniert alles offline.</string>
+    <string name="choose_model">Modell wählen</string>
+    <string name="choose_model_hint">Tippen, um die Optionen zu sehen und eines zu laden.</string>
+    <string name="download">Laden</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="delete">Löschen</string>
+    <string name="error">Fehler: %s</string>
+    <string name="voices_none">Keine Stimmen installiert</string>
+    <string name="voice_auto">Automatisch</string>
+    <string name="voices_count">%d Stimmen</string>
+    <string name="voice_label">Stimme %d</string>
+    <string name="voice_needs_internet">braucht Internet</string>
+    <string name="precision">Genauigkeit</string>
+    <string name="speed">Geschwindigkeit</string>
+    <string name="bytes_of">%1$s von %2$s</string>
+    <string name="err_wrong_size">falsche Größe</string>
+    <string name="err_cannot_save">Datei konnte nicht gespeichert werden</string>
+    <string name="note_whisper_turbo">Versteht am besten.</string>
+    <string name="note_whisper_medium">Langsamer als turbo.</string>
+    <string name="note_whisper_small">Versteht schlechter.</string>
+    <string name="note_whisper_base">Nur für einfache Sätze.</string>
+    <string name="note_tg_q8">Verlustfrei. Mit 8 GB RAM wird das Handy sehr langsam.</string>
+    <string name="note_tg_q6">Fast verlustfrei. Braucht viel Speicher.</string>
+    <string name="note_tg_faithful">Treu, erfindet nichts.</string>
+    <string name="note_tg_q3">Leichter, übersetzt etwas schlechter.</string>
+    <string name="note_gemma4_q8">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\"). Sehr langsam mit 8 GB RAM.</string>
+    <string name="note_gemma4">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\").</string>
+    <string name="note_gemma1">Übersetzt schlecht und erfindet. Spricht argentinisches Spanisch (\"vos\").</string>
+</resources>

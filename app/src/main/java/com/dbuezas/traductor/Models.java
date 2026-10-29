@@ -19,13 +19,13 @@ final class Models {
         final String id;
         final Kind kind;
         final String label;
-        final String note;
+        final int note;          // string resource
         final String url;
         final long size;
         final boolean general;   // translator: a general chat model, not TranslateGemma (other prompt)
         final int precision, speed;   // 1..5
 
-        Model(String id, Kind kind, String label, String note, String url, long size, boolean general,
+        Model(String id, Kind kind, String label, int note, String url, long size, boolean general,
               int precision, int speed) {
             this.id = id;
             this.kind = kind;
@@ -46,38 +46,38 @@ final class Models {
      * Pixel 7 and how the sizes and quantizations usually compare; not an exact benchmark.
      */
     static final Model[] ALL = {
-        whisper("large-v3-turbo", 874188075L, 5, 3, "El que mejor entiende."),
-        whisper("medium", 823369779L, 4, 2, "Más lento que turbo."),
-        whisper("small", 264464607L, 3, 4, "Entiende peor."),
-        whisper("base", 81768585L, 2, 5, "Solo para frases simples."),
-        tg("Q8_0", 4130417472L, 5, 1, "Sin pérdida. Con 8 GB de RAM el celular se pone muy lento."),
-        tg("Q6_K", 3190755392L, 5, 2, "Casi sin pérdida. Usa mucha memoria."),
-        tg("Q5_K_M", 2829713472L, 4, 3, "Fiel, no inventa."),
-        tg("Q5_K_S", 2764607552L, 4, 3, "Fiel, no inventa."),
-        tg("Q4_K_M", 2489909312L, 4, 3, "Fiel, no inventa."),
-        tg("Q4_K_S", 2377945152L, 3, 3, "Fiel, no inventa."),
-        tg("Q3_K_L", 2236100672L, 3, 4, "Más liviano, traduce un poco peor."),
-        gemma("4b", "Q8_0", 4130226336L, 3, 1, "A veces inventa frases. Habla con \"vos\". Muy lento con 8 GB de RAM."),
-        gemma("4b", "Q4_K_M", 2489757856L, 3, 3, "A veces inventa frases. Habla con \"vos\"."),
-        gemma("1b", "Q8_0", 1069306368L, 1, 5, "Traduce mal e inventa. Habla con \"vos\"."),
-        gemma("1b", "Q4_K_M", 806058240L, 1, 5, "Traduce mal e inventa. Habla con \"vos\"."),
+        whisper("large-v3-turbo", 874188075L, 5, 3, R.string.note_whisper_turbo),
+        whisper("medium", 823369779L, 4, 2, R.string.note_whisper_medium),
+        whisper("small", 264464607L, 3, 4, R.string.note_whisper_small),
+        whisper("base", 81768585L, 2, 5, R.string.note_whisper_base),
+        tg("Q8_0", 4130417472L, 5, 1, R.string.note_tg_q8),
+        tg("Q6_K", 3190755392L, 5, 2, R.string.note_tg_q6),
+        tg("Q5_K_M", 2829713472L, 4, 3, R.string.note_tg_faithful),
+        tg("Q5_K_S", 2764607552L, 4, 3, R.string.note_tg_faithful),
+        tg("Q4_K_M", 2489909312L, 4, 3, R.string.note_tg_faithful),
+        tg("Q4_K_S", 2377945152L, 3, 3, R.string.note_tg_faithful),
+        tg("Q3_K_L", 2236100672L, 3, 4, R.string.note_tg_q3),
+        gemma("4b", "Q8_0", 4130226336L, 3, 1, R.string.note_gemma4_q8),
+        gemma("4b", "Q4_K_M", 2489757856L, 3, 3, R.string.note_gemma4),
+        gemma("1b", "Q8_0", 1069306368L, 1, 5, R.string.note_gemma1),
+        gemma("1b", "Q4_K_M", 806058240L, 1, 5, R.string.note_gemma1),
     };
 
     /** Whisper, q8 (q5 is much slower on phone CPUs). */
-    private static Model whisper(String name, long size, int precision, int speed, String note) {
+    private static Model whisper(String name, long size, int precision, int speed, int note) {
         String file = "ggml-" + name + "-q8_0.bin";
         return new Model(file, Kind.WHISPER, "Whisper " + name + " (q8)", note, WHISPER + file, size, false, precision, speed);
     }
 
     /** TranslateGemma 4B in one quantization. */
-    private static Model tg(String quant, long size, int precision, int speed, String note) {
+    private static Model tg(String quant, long size, int precision, int speed, int note) {
         String file = "translategemma-4b-it-" + quant + ".gguf";
         return new Model(file, Kind.TRANSLATOR, "TranslateGemma 4B (" + quant + ")", note,
                 "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/" + file, size, false, precision, speed);
     }
 
     /** General Gemma 3 (not made for translation), asked to translate with an instruction. */
-    private static Model gemma(String params, String quant, long size, int precision, int speed, String note) {
+    private static Model gemma(String params, String quant, long size, int precision, int speed, int note) {
         String file = "gemma-3-" + params + "-it-" + quant + ".gguf";
         return new Model(file, Kind.TRANSLATOR, "Gemma 3 " + params.toUpperCase() + " (" + quant + ")", note,
                 "https://huggingface.co/ggml-org/gemma-3-" + params + "-it-GGUF/resolve/main/" + file, size, true, precision, speed);
@@ -167,8 +167,8 @@ final class Models {
                         }
                     }
                 }
-                if (part.length() != m.size) throw new Exception("tamaño incorrecto");
-                if (!part.renameTo(file(app, m))) throw new Exception("no pude guardar el archivo");
+                if (part.length() != m.size) throw new Exception(app.getString(R.string.err_wrong_size));
+                if (!part.renameTo(file(app, m))) throw new Exception(app.getString(R.string.err_cannot_save));
                 if (selectedId(app, m.kind) == null) select(app, m);
             } catch (InterruptedException e) {
                 part.delete();

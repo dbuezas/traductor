@@ -32,10 +32,10 @@ final class Voices {
     }
 
     /** Voice names are codes like "de-de-x-deb-local": show the country and whether it needs internet. */
-    static String label(Voice v, int index) {
+    static String label(Context c, Voice v, int index) {
         String country = v.getLocale().getDisplayCountry();
-        return "Voz " + (index + 1) + (country.isEmpty() ? "" : " · " + country)
-                + (v.isNetworkConnectionRequired() ? " · necesita internet" : "");
+        return c.getString(R.string.voice_label, index + 1) + (country.isEmpty() ? "" : " · " + country)
+                + (v.isNetworkConnectionRequired() ? " · " + c.getString(R.string.voice_needs_internet) : "");
     }
 
     static String chosen(Context c, Lang l) {
