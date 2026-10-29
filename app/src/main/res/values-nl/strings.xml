@@ -33,17 +33,8 @@
     <string name="bytes_of">%1$s van %2$s</string>
     <string name="err_wrong_size">verkeerde grootte</string>
     <string name="err_cannot_save">kon het bestand niet opslaan</string>
-    <string name="note_whisper_turbo">Begrijpt het best.</string>
-    <string name="note_whisper_medium">Trager dan turbo.</string>
-    <string name="note_whisper_small">Begrijpt slechter.</string>
-    <string name="note_whisper_base">Alleen voor eenvoudige zinnen.</string>
-    <string name="note_tg_q8">Verliesvrij. Erg traag met 8 GB RAM.</string>
-    <string name="note_tg_q6">Bijna verliesvrij. Gebruikt veel geheugen.</string>
-    <string name="note_tg_faithful">Trouw, verzint niets.</string>
-    <string name="note_tg_q3">Lichter, vertaalt iets slechter.</string>
-    <string name="note_gemma4_q8">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\"). Erg traag met 8 GB RAM.</string>
-    <string name="note_gemma4">Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\").</string>
-    <string name="note_gemma1">Vertaalt slecht en verzint. Spreekt Argentijns Spaans (\"vos\").</string>
     <string name="downloads_channel">Modeldownloads</string>
     <string name="downloads_title">%d modellen downloaden</string>
+    <string name="more_models">Meer modellen (niet getest, gevonden op Hugging Face)</string>
+    <string name="untested">Nog niet getest</string>
 </resources>

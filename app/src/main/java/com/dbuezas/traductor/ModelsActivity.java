@@ -29,6 +29,7 @@ public class ModelsActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         Ui.init(this);
+        Models.init(this);
         ScrollView scroll = new ScrollView(this);
         scroll.setFitsSystemWindows(true);
         scroll.setBackgroundColor(Ui.BG);
@@ -52,6 +53,7 @@ public class ModelsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        Models.refresh(this, () -> runOnUiThread(this::render));   // newest catalog and more models
         // progress only updates its bar and number: redrawing everything ~20 times per second
         // would swap the buttons under the finger, so a second "Bajar" tap would get lost
         Models.listener = (m, done) -> runOnUiThread(() -> {
@@ -105,7 +107,7 @@ public class ModelsActivity extends Activity {
      */
     private void section(Models.Kind kind) {
         boolean downloading = false;
-        for (Models.Model m : Models.ALL) if (m.kind == kind && Models.isDownloading(m)) downloading = true;
+        for (Models.Model m : Models.all()) if (m.kind == kind && Models.isDownloading(m)) downloading = true;
         boolean expanded = open.contains(kind) || downloading;
         Models.Model sel = Models.selectedModel(this, kind);
 
@@ -123,14 +125,24 @@ public class ModelsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(Ui.text(this, sel != null ? sel.label : getString(R.string.choose_model), 17, Ui.TEXT, true));
         if (sel != null) texts.addView(ratings(sel));
-        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + " · " + getString(sel.note) : getString(R.string.choose_model_hint), 14, Ui.MUTED, false));
+        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + (sel.note().isEmpty() ? "" : " · " + sel.note()) : getString(R.string.choose_model_hint), 14, Ui.MUTED, false));
         box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         box.addView(Ui.text(this, expanded ? "▴" : "▾", 22, Ui.MUTED, false));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(8);
         list.addView(box, lp);
 
-        if (expanded) for (Models.Model m : Models.ALL) if (m.kind == kind) row(m);
+        if (!expanded) return;
+        for (Models.Model m : Models.catalog) if (m.kind == kind) row(m);
+        // found on Hugging Face, not tested by me
+        boolean any = false;
+        for (Models.Model m : Models.discovered) if (m.kind == kind) any = true;
+        if (any) {
+            TextView t = Ui.text(this, getString(R.string.more_models), 13, Ui.MUTED, true);
+            t.setPadding(dp(16), dp(16), dp(4), dp(2));
+            list.addView(t);
+            for (Models.Model m : Models.discovered) if (m.kind == kind) row(m);
+        }
     }
 
     /** One option in an open section: tap a downloaded one to use it. */
@@ -163,7 +175,7 @@ public class ModelsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(Ui.text(this, (selected ? "✓  " : "") + m.label, 16, selected ? Ui.A_DARK : Ui.TEXT, true));
         texts.addView(ratings(m));
-        texts.addView(Ui.text(this, mb(m.size) + " · " + getString(m.note), 13, Ui.MUTED, false));
+        texts.addView(Ui.text(this, mb(m.size) + (m.note().isEmpty() ? "" : " · " + m.note()), 13, Ui.MUTED, false));
         head.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (downloading) head.addView(button(R.string.cancel, () -> Models.cancel(m)));
         else if (!have) head.addView(button(R.string.download, () -> {
@@ -249,7 +261,8 @@ public class ModelsActivity extends Activity {
 
     /** "Precisión ●●●●○   Velocidad ●●●○○" */
     private TextView ratings(Models.Model m) {
-        TextView t = Ui.text(this, getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed), 13, Ui.MUTED, true);
+        TextView t = Ui.text(this, !m.tested() ? getString(R.string.untested)
+                : getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed), 13, Ui.MUTED, true);
         t.setPadding(0, dp(3), 0, dp(1));
         return t;
     }

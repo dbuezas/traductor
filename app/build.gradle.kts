@@ -69,6 +69,9 @@ android {
         }
     }
 
+    // the model catalog (catalog/models.json) is shipped as an asset; the app also fetches the newest
+    sourceSets["main"].assets.directories.add(rootProject.file("catalog").path)
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

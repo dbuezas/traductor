@@ -33,17 +33,8 @@
     <string name="bytes_of">%1$s di %2$s</string>
     <string name="err_wrong_size">dimensione errata</string>
     <string name="err_cannot_save">impossibile salvare il file</string>
-    <string name="note_whisper_turbo">Quello che capisce meglio.</string>
-    <string name="note_whisper_medium">Più lento di turbo.</string>
-    <string name="note_whisper_small">Capisce peggio.</string>
-    <string name="note_whisper_base">Solo per frasi semplici.</string>
-    <string name="note_tg_q8">Senza perdite. Molto lento con 8 GB di RAM.</string>
-    <string name="note_tg_q6">Quasi senza perdite. Usa molta memoria.</string>
-    <string name="note_tg_faithful">Fedele, non inventa.</string>
-    <string name="note_tg_q3">Più leggero, traduce un po\' peggio.</string>
-    <string name="note_gemma4_q8">A volte inventa frasi. Parla spagnolo argentino (\"vos\"). Molto lento con 8 GB di RAM.</string>
-    <string name="note_gemma4">A volte inventa frasi. Parla spagnolo argentino (\"vos\").</string>
-    <string name="note_gemma1">Traduce male e inventa. Parla spagnolo argentino (\"vos\").</string>
     <string name="downloads_channel">Download dei modelli</string>
     <string name="downloads_title">Scarico %d modelli</string>
+    <string name="more_models">Altri modelli (non testati, trovati su Hugging Face)</string>
+    <string name="untested">Non ancora testato</string>
 </resources>

@@ -34,17 +34,8 @@
     <string name="bytes_of">%1$s of %2$s</string>
     <string name="err_wrong_size">wrong size</string>
     <string name="err_cannot_save">could not save the file</string>
-    <string name="note_whisper_turbo">Understands best.</string>
-    <string name="note_whisper_medium">Slower than turbo.</string>
-    <string name="note_whisper_small">Understands worse.</string>
-    <string name="note_whisper_base">Only for simple sentences.</string>
-    <string name="note_tg_q8">Lossless. Very slow on phones with 8 GB of RAM.</string>
-    <string name="note_tg_q6">Almost lossless. Uses a lot of memory.</string>
-    <string name="note_tg_faithful">Faithful, does not make things up.</string>
-    <string name="note_tg_q3">Lighter, translates a bit worse.</string>
-    <string name="note_gemma4_q8">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\"). Very slow with 8 GB of RAM.</string>
-    <string name="note_gemma4">Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\").</string>
-    <string name="note_gemma1">Translates badly and makes things up. Speaks Rioplatense Spanish (\"vos\").</string>
     <string name="downloads_channel">Model downloads</string>
     <string name="downloads_title">Downloading %d models</string>
+    <string name="more_models">More models (untested, found on Hugging Face)</string>
+    <string name="untested">Not tested yet</string>
 </resources>

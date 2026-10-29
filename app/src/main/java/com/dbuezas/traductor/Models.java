@@ -8,86 +8,150 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** Model catalog, download/delete, and which model is selected. */
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+/**
+ * The models: the tested catalog (catalog/models.json in the repo, shipped in the app and
+ * refreshed from GitHub), plus "more models" found on Hugging Face from trusted publishers
+ * (untested). Also downloads, deletes, and which model is selected.
+ */
 final class Models {
     enum Kind { WHISPER, TRANSLATOR }
 
     static final class Model {
-        final String id;
+        final String id;          // file name on the phone
         final Kind kind;
         final String label;
-        final int note;          // string resource
+        final Map<String, String> notes;   // language code -> note; empty for discovered models
         final String url;
         final long size;
-        final boolean general;   // translator: a general chat model, not TranslateGemma (other prompt)
-        final int precision, speed;   // 1..5
+        final boolean general;    // translator: a general chat model, not TranslateGemma (other prompt)
+        final int precision, speed;   // 1..5; 0 = not tested
 
-        Model(String id, Kind kind, String label, int note, String url, long size, boolean general,
+        Model(String id, Kind kind, String label, Map<String, String> notes, String url, long size, boolean general,
               int precision, int speed) {
             this.id = id;
             this.kind = kind;
             this.label = label;
-            this.note = note;
+            this.notes = notes;
             this.url = url;
             this.size = size;
             this.general = general;
             this.precision = precision;
             this.speed = speed;
         }
+
+        boolean tested() {
+            return precision > 0;
+        }
+
+        /** The note in the phone's language, else English. */
+        String note() {
+            String n = notes.get(java.util.Locale.getDefault().getLanguage());
+            return n != null ? n : notes.getOrDefault("en", "");
+        }
     }
 
-    private static final String WHISPER = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+    private static final String CATALOG_URL = "https://raw.githubusercontent.com/dbuezas/traductor/main/catalog/models.json";
+    static volatile List<Model> catalog = new ArrayList<>();
+    static volatile List<Model> discovered = new ArrayList<>();
 
-    /**
-     * Best to worst within each kind. Precision and speed are 1..5, my estimate from tests on a
-     * Pixel 7 and how the sizes and quantizations usually compare; not an exact benchmark.
-     */
-    static final Model[] ALL = {
-        whisper("large-v3-turbo", 874188075L, 5, 3, R.string.note_whisper_turbo),
-        whisper("medium", 823369779L, 4, 2, R.string.note_whisper_medium),
-        whisper("small", 264464607L, 3, 4, R.string.note_whisper_small),
-        whisper("base", 81768585L, 2, 5, R.string.note_whisper_base),
-        tg("Q8_0", 4130417472L, 5, 1, R.string.note_tg_q8),
-        tg("Q6_K", 3190755392L, 5, 2, R.string.note_tg_q6),
-        tg("Q5_K_M", 2829713472L, 4, 3, R.string.note_tg_faithful),
-        tg("Q5_K_S", 2764607552L, 4, 3, R.string.note_tg_faithful),
-        tg("Q4_K_M", 2489909312L, 4, 3, R.string.note_tg_faithful),
-        tg("Q4_K_S", 2377945152L, 3, 3, R.string.note_tg_faithful),
-        tg("Q3_K_L", 2236100672L, 3, 4, R.string.note_tg_q3),
-        gemma("4b", "Q8_0", 4130226336L, 3, 1, R.string.note_gemma4_q8),
-        gemma("4b", "Q4_K_M", 2489757856L, 3, 3, R.string.note_gemma4),
-        gemma("1b", "Q8_0", 1069306368L, 1, 5, R.string.note_gemma1),
-        gemma("1b", "Q4_K_M", 806058240L, 1, 5, R.string.note_gemma1),
-    };
-
-    /** Whisper, q8 (q5 is much slower on phone CPUs). */
-    private static Model whisper(String name, long size, int precision, int speed, int note) {
-        String file = "ggml-" + name + "-q8_0.bin";
-        return new Model(file, Kind.WHISPER, "Whisper " + name + " (q8)", note, WHISPER + file, size, false, precision, speed);
+    /** Tested models first (best to worst per kind), then the discovered ones. */
+    static List<Model> all() {
+        List<Model> out = new ArrayList<>(catalog);
+        out.addAll(discovered);
+        return out;
     }
 
-    /** TranslateGemma 4B in one quantization. */
-    private static Model tg(String quant, long size, int precision, int speed, int note) {
-        String file = "translategemma-4b-it-" + quant + ".gguf";
-        return new Model(file, Kind.TRANSLATOR, "TranslateGemma 4B (" + quant + ")", note,
-                "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/" + file, size, false, precision, speed);
+    static Model byId(String id) {
+        for (Model m : all()) if (m.id.equals(id)) return m;
+        return null;
     }
 
-    /** General Gemma 3 (not made for translation), asked to translate with an instruction. */
-    private static Model gemma(String params, String quant, long size, int precision, int speed, int note) {
-        String file = "gemma-3-" + params + "-it-" + quant + ".gguf";
-        return new Model(file, Kind.TRANSLATOR, "Gemma 3 " + params.toUpperCase() + " (" + quant + ")", note,
-                "https://huggingface.co/ggml-org/gemma-3-" + params + "-it-GGUF/resolve/main/" + file, size, true, precision, speed);
+    /** Loads the newest saved catalog (or the one in the app) and the last discovery results. */
+    static synchronized void init(Context c) {
+        if (!catalog.isEmpty()) return;
+        try {
+            File saved = new File(c.getFilesDir(), "catalog.json");
+            String json = saved.exists() ? read(new java.io.FileInputStream(saved)) : read(c.getAssets().open("models.json"));
+            catalog = parse(json);
+        } catch (Exception e) {
+            try {
+                catalog = parse(read(c.getAssets().open("models.json")));
+            } catch (Exception ignored) {}
+        }
+        try {
+            File saved = new File(c.getFilesDir(), "discovered.json");
+            if (saved.exists()) discovered = parse(read(new java.io.FileInputStream(saved)));
+        } catch (Exception ignored) {}
+    }
+
+    /** In the background: newest catalog from GitHub, then the search on Hugging Face. */
+    static void refresh(Context ctx, Runnable done) {
+        Context app = ctx.getApplicationContext();
+        new Thread(() -> {
+            try {
+                String json = read(new URL(CATALOG_URL).openStream());
+                List<Model> fresh = parse(json);
+                if (!fresh.isEmpty()) {
+                    catalog = fresh;
+                    write(new File(app.getFilesDir(), "catalog.json"), json);
+                }
+            } catch (Exception ignored) {}   // offline: keep what we have
+            try {
+                JSONArray found = Discovery.search(catalog);
+                discovered = parse(new JSONObject().put("models", found).toString());
+                write(new File(app.getFilesDir(), "discovered.json"), new JSONObject().put("models", found).toString());
+            } catch (Exception ignored) {}
+            done.run();
+        }).start();
+    }
+
+    static List<Model> parse(String json) throws JSONException {
+        List<Model> out = new ArrayList<>();
+        JSONArray a = new JSONObject(json).getJSONArray("models");
+        for (int i = 0; i < a.length(); i++) {
+            JSONObject o = a.getJSONObject(i);
+            Map<String, String> notes = new HashMap<>();
+            JSONObject n = o.optJSONObject("note");
+            if (n != null) for (java.util.Iterator<String> it = n.keys(); it.hasNext(); ) {
+                String k = it.next();
+                notes.put(k, n.getString(k));
+            }
+            out.add(new Model(o.getString("id"), o.getString("kind").equals("whisper") ? Kind.WHISPER : Kind.TRANSLATOR,
+                    o.getString("label"), notes, o.getString("url"), o.getLong("size"), o.optBoolean("general"),
+                    o.optInt("precision"), o.optInt("speed")));
+        }
+        return out;
+    }
+
+    static String read(InputStream in) throws java.io.IOException {
+        try (InputStream i = in) {
+            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[1 << 14];
+            int n;
+            while ((n = i.read(buf)) > 0) b.write(buf, 0, n);
+            return b.toString("UTF-8");
+        }
+    }
+
+    private static void write(File f, String s) throws java.io.IOException {
+        try (FileOutputStream out = new FileOutputStream(f)) {
+            out.write(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
     }
 
     /** The selected model of a kind, if downloaded (null otherwise). */
     static Model selectedModel(Context c, Kind k) {
-        String id = selectedId(c, k);
-        for (Model m : ALL) if (m.id.equals(id) && isDownloaded(c, m)) return m;
-        return null;
+        Model m = byId(selectedId(c, k));
+        return m != null && isDownloaded(c, m) ? m : null;
     }
 
     static File dir(Context c) {
@@ -118,9 +182,8 @@ final class Models {
 
     /** The selected model of a kind, if it is downloaded. */
     static File selectedFile(Context c, Kind k) {
-        String id = selectedId(c, k);
-        for (Model m : ALL) if (m.id.equals(id) && isDownloaded(c, m)) return file(c, m);
-        return null;
+        Model m = selectedModel(c, k);
+        return m == null ? null : file(c, m);
     }
 
     // ---- downloads (they keep running when the screen closes) ----
@@ -139,7 +202,7 @@ final class Models {
     /** Downloads running now. */
     static synchronized java.util.List<Model> downloading() {
         java.util.List<Model> out = new java.util.ArrayList<>();
-        for (Model m : ALL) if (running.containsKey(m.id)) out.add(m);
+        for (Model m : all()) if (running.containsKey(m.id)) out.add(m);
         return out;
     }
 

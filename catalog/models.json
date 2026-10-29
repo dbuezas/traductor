@@ -1,0 +1,279 @@
+{
+ "_comment": "Model catalog of the app, best to worst per kind. precision/speed 1..5. The app ships this file and also fetches the latest version from GitHub. general: a general chat model (plain instruction prompt) instead of TranslateGemma's prompt format.",
+ "models": [
+  {
+   "id": "ggml-large-v3-turbo-q8_0.bin",
+   "kind": "whisper",
+   "label": "Whisper large-v3-turbo (q8)",
+   "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin",
+   "size": 874188075,
+   "precision": 5,
+   "speed": 3,
+   "note": {
+    "en": "Understands best.",
+    "es": "El que mejor entiende.",
+    "de": "Versteht am besten.",
+    "fr": "Celui qui comprend le mieux.",
+    "it": "Quello che capisce meglio.",
+    "pt": "O que melhor entende.",
+    "nl": "Begrijpt het best."
+   }
+  },
+  {
+   "id": "ggml-medium-q8_0.bin",
+   "kind": "whisper",
+   "label": "Whisper medium (q8)",
+   "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q8_0.bin",
+   "size": 823369779,
+   "precision": 4,
+   "speed": 2,
+   "note": {
+    "en": "Slower than turbo.",
+    "es": "Más lento que turbo.",
+    "de": "Langsamer als turbo.",
+    "fr": "Plus lent que turbo.",
+    "it": "Più lento di turbo.",
+    "pt": "Mais lento que o turbo.",
+    "nl": "Trager dan turbo."
+   }
+  },
+  {
+   "id": "ggml-small-q8_0.bin",
+   "kind": "whisper",
+   "label": "Whisper small (q8)",
+   "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q8_0.bin",
+   "size": 264464607,
+   "precision": 3,
+   "speed": 4,
+   "note": {
+    "en": "Understands worse.",
+    "es": "Entiende peor.",
+    "de": "Versteht schlechter.",
+    "fr": "Comprend moins bien.",
+    "it": "Capisce peggio.",
+    "pt": "Entende pior.",
+    "nl": "Begrijpt slechter."
+   }
+  },
+  {
+   "id": "ggml-base-q8_0.bin",
+   "kind": "whisper",
+   "label": "Whisper base (q8)",
+   "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q8_0.bin",
+   "size": 81768585,
+   "precision": 2,
+   "speed": 5,
+   "note": {
+    "en": "Only for simple sentences.",
+    "es": "Solo para frases simples.",
+    "de": "Nur für einfache Sätze.",
+    "fr": "Seulement pour des phrases simples.",
+    "it": "Solo per frasi semplici.",
+    "pt": "Só para frases simples.",
+    "nl": "Alleen voor eenvoudige zinnen."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q8_0.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q8_0)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q8_0.gguf",
+   "size": 4130417472,
+   "precision": 5,
+   "speed": 1,
+   "note": {
+    "en": "Lossless. Very slow on phones with 8 GB of RAM.",
+    "es": "Sin pérdida. Con 8 GB de RAM el celular se pone muy lento.",
+    "de": "Verlustfrei. Mit 8 GB RAM wird das Handy sehr langsam.",
+    "fr": "Sans perte. Très lent avec 8 Go de RAM.",
+    "it": "Senza perdite. Molto lento con 8 GB di RAM.",
+    "pt": "Sem perda. Muito lento com 8 GB de RAM.",
+    "nl": "Verliesvrij. Erg traag met 8 GB RAM."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q6_K.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q6_K)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q6_K.gguf",
+   "size": 3190755392,
+   "precision": 5,
+   "speed": 2,
+   "note": {
+    "en": "Almost lossless. Uses a lot of memory.",
+    "es": "Casi sin pérdida. Usa mucha memoria.",
+    "de": "Fast verlustfrei. Braucht viel Speicher.",
+    "fr": "Presque sans perte. Utilise beaucoup de mémoire.",
+    "it": "Quasi senza perdite. Usa molta memoria.",
+    "pt": "Quase sem perda. Usa muita memória.",
+    "nl": "Bijna verliesvrij. Gebruikt veel geheugen."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q5_K_M.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q5_K_M)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q5_K_M.gguf",
+   "size": 2829713472,
+   "precision": 4,
+   "speed": 3,
+   "note": {
+    "en": "Faithful, does not make things up.",
+    "es": "Fiel, no inventa.",
+    "de": "Treu, erfindet nichts.",
+    "fr": "Fidèle, n'invente rien.",
+    "it": "Fedele, non inventa.",
+    "pt": "Fiel, não inventa.",
+    "nl": "Trouw, verzint niets."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q5_K_S.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q5_K_S)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q5_K_S.gguf",
+   "size": 2764607552,
+   "precision": 4,
+   "speed": 3,
+   "note": {
+    "en": "Faithful, does not make things up.",
+    "es": "Fiel, no inventa.",
+    "de": "Treu, erfindet nichts.",
+    "fr": "Fidèle, n'invente rien.",
+    "it": "Fedele, non inventa.",
+    "pt": "Fiel, não inventa.",
+    "nl": "Trouw, verzint niets."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q4_K_M.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q4_K_M)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q4_K_M.gguf",
+   "size": 2489909312,
+   "precision": 4,
+   "speed": 3,
+   "note": {
+    "en": "Faithful, does not make things up.",
+    "es": "Fiel, no inventa.",
+    "de": "Treu, erfindet nichts.",
+    "fr": "Fidèle, n'invente rien.",
+    "it": "Fedele, non inventa.",
+    "pt": "Fiel, não inventa.",
+    "nl": "Trouw, verzint niets."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q4_K_S.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q4_K_S)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q4_K_S.gguf",
+   "size": 2377945152,
+   "precision": 3,
+   "speed": 3,
+   "note": {
+    "en": "Faithful, does not make things up.",
+    "es": "Fiel, no inventa.",
+    "de": "Treu, erfindet nichts.",
+    "fr": "Fidèle, n'invente rien.",
+    "it": "Fedele, non inventa.",
+    "pt": "Fiel, não inventa.",
+    "nl": "Trouw, verzint niets."
+   }
+  },
+  {
+   "id": "translategemma-4b-it-Q3_K_L.gguf",
+   "kind": "translator",
+   "label": "TranslateGemma 4B (Q3_K_L)",
+   "url": "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q3_K_L.gguf",
+   "size": 2236100672,
+   "precision": 3,
+   "speed": 4,
+   "note": {
+    "en": "Lighter, translates a bit worse.",
+    "es": "Más liviano, traduce un poco peor.",
+    "de": "Leichter, übersetzt etwas schlechter.",
+    "fr": "Plus léger, traduit un peu moins bien.",
+    "it": "Più leggero, traduce un po' peggio.",
+    "pt": "Mais leve, traduz um pouco pior.",
+    "nl": "Lichter, vertaalt iets slechter."
+   }
+  },
+  {
+   "id": "gemma-3-4b-it-Q8_0.gguf",
+   "kind": "translator",
+   "label": "Gemma 3 4B (Q8_0)",
+   "url": "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q8_0.gguf",
+   "size": 4130226336,
+   "general": true,
+   "precision": 3,
+   "speed": 1,
+   "note": {
+    "en": "Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\"). Very slow with 8 GB of RAM.",
+    "es": "A veces inventa frases. Habla con \"vos\". Muy lento con 8 GB de RAM.",
+    "de": "Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\"). Sehr langsam mit 8 GB RAM.",
+    "fr": "Invente parfois des phrases. Parle l'espagnol d'Argentine (\"vos\"). Très lent avec 8 Go de RAM.",
+    "it": "A volte inventa frasi. Parla spagnolo argentino (\"vos\"). Molto lento con 8 GB di RAM.",
+    "pt": "Às vezes inventa frases. Fala espanhol argentino (\"vos\"). Muito lento com 8 GB de RAM.",
+    "nl": "Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\"). Erg traag met 8 GB RAM."
+   }
+  },
+  {
+   "id": "gemma-3-4b-it-Q4_K_M.gguf",
+   "kind": "translator",
+   "label": "Gemma 3 4B (Q4_K_M)",
+   "url": "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
+   "size": 2489757856,
+   "general": true,
+   "precision": 3,
+   "speed": 3,
+   "note": {
+    "en": "Sometimes makes up sentences. Speaks Rioplatense Spanish (\"vos\").",
+    "es": "A veces inventa frases. Habla con \"vos\".",
+    "de": "Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\").",
+    "fr": "Invente parfois des phrases. Parle l'espagnol d'Argentine (\"vos\").",
+    "it": "A volte inventa frasi. Parla spagnolo argentino (\"vos\").",
+    "pt": "Às vezes inventa frases. Fala espanhol argentino (\"vos\").",
+    "nl": "Verzint soms zinnen. Spreekt Argentijns Spaans (\"vos\")."
+   }
+  },
+  {
+   "id": "gemma-3-1b-it-Q8_0.gguf",
+   "kind": "translator",
+   "label": "Gemma 3 1B (Q8_0)",
+   "url": "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q8_0.gguf",
+   "size": 1069306368,
+   "general": true,
+   "precision": 1,
+   "speed": 5,
+   "note": {
+    "en": "Translates badly and makes things up. Speaks Rioplatense Spanish (\"vos\").",
+    "es": "Traduce mal e inventa. Habla con \"vos\".",
+    "de": "Übersetzt schlecht und erfindet. Spricht argentinisches Spanisch (\"vos\").",
+    "fr": "Traduit mal et invente. Parle l'espagnol d'Argentine (\"vos\").",
+    "it": "Traduce male e inventa. Parla spagnolo argentino (\"vos\").",
+    "pt": "Traduz mal e inventa. Fala espanhol argentino (\"vos\").",
+    "nl": "Vertaalt slecht en verzint. Spreekt Argentijns Spaans (\"vos\")."
+   }
+  },
+  {
+   "id": "gemma-3-1b-it-Q4_K_M.gguf",
+   "kind": "translator",
+   "label": "Gemma 3 1B (Q4_K_M)",
+   "url": "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf",
+   "size": 806058240,
+   "general": true,
+   "precision": 1,
+   "speed": 5,
+   "note": {
+    "en": "Translates badly and makes things up. Speaks Rioplatense Spanish (\"vos\").",
+    "es": "Traduce mal e inventa. Habla con \"vos\".",
+    "de": "Übersetzt schlecht und erfindet. Spricht argentinisches Spanisch (\"vos\").",
+    "fr": "Traduit mal et invente. Parle l'espagnol d'Argentine (\"vos\").",
+    "it": "Traduce male e inventa. Parla spagnolo argentino (\"vos\").",
+    "pt": "Traduz mal e inventa. Fala espanhol argentino (\"vos\").",
+    "nl": "Vertaalt slecht en verzint. Spreekt Argentijns Spaans (\"vos\")."
+   }
+  }
+ ]
+}

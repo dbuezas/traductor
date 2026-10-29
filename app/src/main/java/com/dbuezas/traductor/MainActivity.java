@@ -353,6 +353,7 @@ public class MainActivity extends Activity implements Engine.Listener {
         langA = Lang.byCode(p.getString("langA", "es"), Lang.ES);
         langB = Lang.byCode(p.getString("langB", "de"), Lang.DE);
         turnMode = p.getBoolean("turnMode", false);
+        Models.init(this);
         buildUi();
 
         File cache = new File(getFilesDir(), "cache");

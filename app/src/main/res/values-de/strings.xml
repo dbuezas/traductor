@@ -33,17 +33,8 @@
     <string name="bytes_of">%1$s von %2$s</string>
     <string name="err_wrong_size">falsche Größe</string>
     <string name="err_cannot_save">Datei konnte nicht gespeichert werden</string>
-    <string name="note_whisper_turbo">Versteht am besten.</string>
-    <string name="note_whisper_medium">Langsamer als turbo.</string>
-    <string name="note_whisper_small">Versteht schlechter.</string>
-    <string name="note_whisper_base">Nur für einfache Sätze.</string>
-    <string name="note_tg_q8">Verlustfrei. Mit 8 GB RAM wird das Handy sehr langsam.</string>
-    <string name="note_tg_q6">Fast verlustfrei. Braucht viel Speicher.</string>
-    <string name="note_tg_faithful">Treu, erfindet nichts.</string>
-    <string name="note_tg_q3">Leichter, übersetzt etwas schlechter.</string>
-    <string name="note_gemma4_q8">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\"). Sehr langsam mit 8 GB RAM.</string>
-    <string name="note_gemma4">Erfindet manchmal Sätze. Spricht argentinisches Spanisch (\"vos\").</string>
-    <string name="note_gemma1">Übersetzt schlecht und erfindet. Spricht argentinisches Spanisch (\"vos\").</string>
     <string name="downloads_channel">Modell-Downloads</string>
     <string name="downloads_title">Lade %d Modelle</string>
+    <string name="more_models">Weitere Modelle (ungetestet, auf Hugging Face gefunden)</string>
+    <string name="untested">Noch nicht getestet</string>
 </resources>
