@@ -38,4 +38,14 @@
     <string name="downloads_title">Downloading %d models</string>
     <string name="more_models">More models (untested, found on Hugging Face)</string>
     <string name="untested">Not tested yet</string>
+    <string name="fam_translategemma">Made for translating.</string>
+    <string name="fam_gemma">General model: sometimes makes up sentences; speaks Rioplatense Spanish (\"vos\").</string>
+    <string name="fam_gemma_small">Very small general model: translates badly.</string>
+    <string name="fam_whisper">Speech to text.</string>
+    <string name="bits_8">%d bits: almost lossless, big.</string>
+    <string name="bits_6">%d bits: very little loss.</string>
+    <string name="bits_5">%d bits: little loss.</string>
+    <string name="bits_4">%d bits: good balance of size and quality.</string>
+    <string name="bits_3">%d bits: noticeable loss.</string>
+    <string name="bits_full">Uncompressed: big and slow.</string>
 </resources>

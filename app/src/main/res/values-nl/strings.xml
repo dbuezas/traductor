@@ -37,4 +37,14 @@
     <string name="downloads_title">%d modellen downloaden</string>
     <string name="more_models">Meer modellen (niet getest, gevonden op Hugging Face)</string>
     <string name="untested">Nog niet getest</string>
+    <string name="fam_translategemma">Gemaakt om te vertalen.</string>
+    <string name="fam_gemma">Algemeen model: verzint soms zinnen; spreekt Argentijns Spaans (\"vos\").</string>
+    <string name="fam_gemma_small">Heel klein algemeen model: vertaalt slecht.</string>
+    <string name="fam_whisper">Spraak naar tekst.</string>
+    <string name="bits_8">%d bits: bijna verliesvrij, groot.</string>
+    <string name="bits_6">%d bits: heel weinig verlies.</string>
+    <string name="bits_5">%d bits: weinig verlies.</string>
+    <string name="bits_4">%d bits: goede balans tussen grootte en kwaliteit.</string>
+    <string name="bits_3">%d bits: merkbaar verlies.</string>
+    <string name="bits_full">Ongecomprimeerd: groot en traag.</string>
 </resources>

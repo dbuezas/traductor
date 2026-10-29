@@ -125,7 +125,7 @@ public class ModelsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(Ui.text(this, sel != null ? sel.label : getString(R.string.choose_model), 17, Ui.TEXT, true));
         if (sel != null) texts.addView(ratings(sel));
-        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + (sel.note().isEmpty() ? "" : " · " + sel.note()) : getString(R.string.choose_model_hint), 14, Ui.MUTED, false));
+        texts.addView(Ui.text(this, sel != null ? mb(sel.size) + (sel.note(this).isEmpty() ? "" : " · " + sel.note(this)) : getString(R.string.choose_model_hint), 14, Ui.MUTED, false));
         box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         box.addView(Ui.text(this, expanded ? "▴" : "▾", 22, Ui.MUTED, false));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -175,7 +175,7 @@ public class ModelsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(Ui.text(this, (selected ? "✓  " : "") + m.label, 16, selected ? Ui.A_DARK : Ui.TEXT, true));
         texts.addView(ratings(m));
-        texts.addView(Ui.text(this, mb(m.size) + (m.note().isEmpty() ? "" : " · " + m.note()), 13, Ui.MUTED, false));
+        texts.addView(Ui.text(this, mb(m.size) + (m.note(this).isEmpty() ? "" : " · " + m.note(this)), 13, Ui.MUTED, false));
         head.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (downloading) head.addView(button(R.string.cancel, () -> Models.cancel(m)));
         else if (!have) head.addView(button(R.string.download, () -> {

@@ -37,4 +37,14 @@
     <string name="downloads_title">Baixando %d modelos</string>
     <string name="more_models">Mais modelos (não testados, encontrados no Hugging Face)</string>
     <string name="untested">Ainda não testado</string>
+    <string name="fam_translategemma">Feito para traduzir.</string>
+    <string name="fam_gemma">Modelo geral: às vezes inventa frases; fala espanhol argentino (\"vos\").</string>
+    <string name="fam_gemma_small">Modelo geral muito pequeno: traduz mal.</string>
+    <string name="fam_whisper">Voz para texto.</string>
+    <string name="bits_8">%d bits: quase sem perda, grande.</string>
+    <string name="bits_6">%d bits: pouquíssima perda.</string>
+    <string name="bits_5">%d bits: pouca perda.</string>
+    <string name="bits_4">%d bits: bom equilíbrio entre tamanho e qualidade.</string>
+    <string name="bits_3">%d bits: perda notável.</string>
+    <string name="bits_full">Sem compressão: grande e lento.</string>
 </resources>

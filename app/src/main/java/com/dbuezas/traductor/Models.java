@@ -52,8 +52,12 @@ final class Models {
             return precision > 0;
         }
 
-        /** The note in the phone's language, else English. */
-        String note() {
+        /**
+         * The note in the phone's language, else English. Models found on Hugging Face have no
+         * note: it is made from the name (model family and how much it is compressed).
+         */
+        String note(Context c) {
+            if (notes.isEmpty()) return Discovery.describe(c, this);
             String n = notes.get(java.util.Locale.getDefault().getLanguage());
             return n != null ? n : notes.getOrDefault("en", "");
         }

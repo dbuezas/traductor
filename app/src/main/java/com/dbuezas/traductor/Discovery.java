@@ -86,5 +86,26 @@ final class Discovery {
         return out;
     }
 
+    private static final Pattern BITS = Pattern.compile("(?i)(?:^|[-._])(?:I?Q|q)(\\d)(?:_|$|\\.|-)");
+
+    /** "Made for translating. 4 bits: good balance of size and quality." from the model's name. */
+    static String describe(android.content.Context c, Models.Model m) {
+        String name = m.url.substring(m.url.lastIndexOf('/') + 1).toLowerCase();
+        String family = m.kind == Models.Kind.WHISPER ? c.getString(R.string.fam_whisper)
+                : name.contains("translategemma") ? c.getString(R.string.fam_translategemma)
+                : name.matches(".*gemma-3-(1b|270m).*") ? c.getString(R.string.fam_gemma_small)
+                : c.getString(R.string.fam_gemma);
+        java.util.regex.Matcher b = BITS.matcher(name.replace(".gguf", "").replace(".bin", ""));
+        String bits;
+        if (!b.find()) {
+            bits = c.getString(R.string.bits_full);   // f16 / bf16 / unquantized whisper
+        } else {
+            int n = Integer.parseInt(b.group(1));
+            bits = c.getString(n >= 8 ? R.string.bits_8 : n == 6 ? R.string.bits_6 : n == 5 ? R.string.bits_5
+                    : n == 4 ? R.string.bits_4 : R.string.bits_3, n);
+        }
+        return family + " " + bits;
+    }
+
     private Discovery() {}
 }
