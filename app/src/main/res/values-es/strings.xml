@@ -16,7 +16,7 @@
     <string name="section_listen">Escuchar (Whisper)</string>
     <string name="section_translate">Traducir</string>
     <string name="section_voices">Voces</string>
-    <string name="settings_note">Ordenados de mejor a peor. Precisión y velocidad son una estimación mía en un Pixel 7. Los modelos se bajan de Hugging Face una sola vez; después todo anda sin internet.</string>
+    <string name="settings_note">Ordenados de mejor a peor, medidos en un Pixel 7 (tools/bench en el repo). Tiempo: lo que tarda el modelo, como parte de lo que tarda decir la frase. Solo aparecen los modelos que ningún otro supera en precisión y velocidad a la vez. Los modelos se bajan de Hugging Face una sola vez; después todo anda sin internet.</string>
     <string name="choose_model">Elegí un modelo</string>
     <string name="choose_model_hint">Tocá para ver las opciones y bajar uno.</string>
     <string name="download">Bajar</string>
@@ -47,4 +47,6 @@
     <string name="bits_4">%d bits: buen equilibrio entre tamaño y calidad.</string>
     <string name="bits_3">%d bits: pérdida notable.</string>
     <string name="bits_full">Sin comprimir: grande y lento.</string>
+    <string name="measured_whisper">%1$s%% de palabras mal · %2$d%% del tiempo hablado</string>
+    <string name="measured_translator">chrF %1$s · %2$d%% del tiempo hablado</string>
 </resources>

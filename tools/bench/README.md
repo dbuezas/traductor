@@ -10,7 +10,7 @@ aloud in many languages. I use 50 German and Spanish ones of 3 to 12 seconds.
 - Whisper: each recording is transcribed; WER (share of words wrong, lower is better).
 - Translators: each German sentence is translated to Spanish and each Spanish one to German;
   chrF (how many character groups match the reference translation, 0-100, higher is better).
-- Time: the median per sentence. For translators without the instruction part, which the app
+- Time: as a share of how long the sentences take to say (50% = done in half the speaking time). For translators without the instruction part, which the app
   has cached.
 
 ```sh

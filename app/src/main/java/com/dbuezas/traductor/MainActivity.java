@@ -739,13 +739,13 @@ public class MainActivity extends Activity implements Engine.Listener {
     }
 
     @Override
-    public void onTranslated(Engine.Utt u) {
+    public void onTranslated(Engine.Utt u, String piece) {
         ui.post(() -> {
             Panel listener = u.lang != langA ? panelA : panelB;
-            if (!ttsReady || u.translationDone().isEmpty()) return;
+            if (!ttsReady || piece.isEmpty()) return;
             setTtsLanguage(listener.lang());
             tts.setSpeechRate(listener.rate());
-            tts.speak(u.translationDone(), TextToSpeech.QUEUE_ADD, null, u.id + ":" + (listener == panelA ? "a" : "b"));
+            tts.speak(piece, TextToSpeech.QUEUE_ADD, null, u.id + ":" + (listener == panelA ? "a" : "b"));
         });
     }
 

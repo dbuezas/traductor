@@ -56,6 +56,7 @@ final class Engine {
         volatile String translating = "";
         volatile boolean recording = true;   // audio still coming in
         volatile boolean ended, spoken, dropped;
+        int toSpeak;   // translations handed to the voice so far
         volatile boolean cancelled;   // thrown away: its work is skipped
 
         final Session session;
@@ -79,7 +80,8 @@ final class Engine {
 
         void onUtt(Utt u);           // created or changed (called on the worker/audio thread)
 
-        void onTranslated(Utt u);    // final translation ready, to be spoken
+        /** The next translated piece of a finished utterance, to be spoken (pieces come in order). */
+        void onTranslated(Utt u, String piece);
     }
 
     private final Listener listener;
@@ -812,10 +814,17 @@ final class Engine {
         maybeSpeak(u);
     }
 
+    /**
+     * Once the speaker stopped, each translated piece is spoken as soon as it is ready, while the
+     * next ones are still being translated (not before: the voice would talk over the speaker).
+     */
     private void maybeSpeak(Utt u) {
-        if (!u.ended || u.spoken || u.translations.size() < u.pieces.size()) return;
-        u.spoken = true;
-        listener.onTranslated(u);
+        synchronized (u) {
+            if (!u.ended || u.spoken) return;
+            while (u.toSpeak < u.translations.size()) listener.onTranslated(u, u.translations.get(u.toSpeak++));
+            if (u.toSpeak < u.pieces.size()) return;
+            u.spoken = true;
+        }
         if (!isListening()) listener.onStatus(R.string.status_ready);
     }
 

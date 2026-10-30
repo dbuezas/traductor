@@ -4,7 +4,7 @@
 //   bench whisper <model.bin> <list>       list lines: id \t lang \t file.wav (16 kHz mono)
 //   bench translate <model.gguf> <general 0/1> <list>
 //                                          list lines: id \t source lang \t target lang \t text
-// Output lines: id \t ms \t text; for whisper also \t the raw "<end ms>\t<word>" lines joined
+// Output lines: id \t ms \t text, and at the end "#ram \t MB"; for whisper also \t the raw "<end ms>\t<word>" lines joined
 // by \x1e, so score.py can drop repetitions the way the app does
 
 #include "../../app/src/main/cpp/native.cpp"
@@ -13,6 +13,15 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
+#include <sys/resource.h>
+
+// last line: "#ram\t<MB>", the most memory the process used (model pages read from the file count)
+static int done() {
+    rusage u;
+    getrusage(RUSAGE_SELF, &u);
+    printf("#ram\t%ld\n", u.ru_maxrss / 1024);
+    return 0;
+}
 
 static double now_ms() {
     return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -62,7 +71,7 @@ int main(int argc, char **argv) {
             printf("%s\t%.0f\t%s\t%s\n", c[0].c_str(), ms, text.c_str(), raw.c_str());
             fflush(stdout);
         }
-        return 0;
+        return done();
     }
     if (mode == "translate" && argc == 5) {
         const bool general = argv[3][0] == '1';
@@ -81,7 +90,7 @@ int main(int argc, char **argv) {
             printf("%s\t%.0f\t%s\n", c[0].c_str(), ms, out.c_str());
             fflush(stdout);
         }
-        return 0;
+        return done();
     }
     fprintf(stderr, "usage: bench whisper <model> <list> | bench translate <model> <general 0/1> <list>\n");
     return 2;

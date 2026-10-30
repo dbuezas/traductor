@@ -16,7 +16,7 @@
     <string name="section_listen">Ascoltare (Whisper)</string>
     <string name="section_translate">Tradurre</string>
     <string name="section_voices">Voci</string>
-    <string name="settings_note">Dal migliore al peggiore. Precisione e velocità sono una mia stima su un Pixel 7. I modelli si scaricano una volta da Hugging Face; poi tutto funziona offline.</string>
+    <string name="settings_note">Dal migliore al peggiore, misurati su un Pixel 7 (tools/bench nel repo). Tempo: quanto impiega il modello, rispetto a quanto dura la frase detta. Sono elencati solo i modelli che nessun altro batte sia in precisione sia in velocità. I modelli si scaricano una volta da Hugging Face; poi tutto funziona offline.</string>
     <string name="choose_model">Scegli un modello</string>
     <string name="choose_model_hint">Tocca per vedere le opzioni e scaricarne uno.</string>
     <string name="download">Scarica</string>
@@ -47,4 +47,6 @@
     <string name="bits_4">%d bit: buon equilibrio tra dimensione e qualità.</string>
     <string name="bits_3">%d bit: perdita notevole.</string>
     <string name="bits_full">Non compresso: grande e lento.</string>
+    <string name="measured_whisper">%1$s%% di parole sbagliate · %2$d%% del tempo parlato</string>
+    <string name="measured_translator">chrF %1$s · %2$d%% del tempo parlato</string>
 </resources>

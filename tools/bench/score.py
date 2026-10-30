@@ -5,10 +5,19 @@
 
 Whisper results: WER (share of words wrong; lower is better), after the same filters the app
 uses (Engine.java): whisper sometimes repeats sentences, and the app drops those. Translator results: chrF
-(character n-gram F-score, 0-100; higher is better). Also the median time per sentence.
+(character n-gram F-score, 0-100; higher is better).
+
+Speed: the time a model needs as a share of how long the sentence takes to say (the audio
+length), over all sentences. 50% means: done in half the time it took to say it.
 """
 import os, re, statistics, sys
 from collections import Counter
+
+# id -> seconds of the recording; the audio of a translator's source sentence has the same id
+seconds = {}
+for line in open(os.path.join(sys.argv[1], "whisper.tsv")):
+    i, lang, wav = line.rstrip("\n").split("\t")
+    seconds[i] = (os.path.getsize(os.path.join(sys.argv[1], wav)) - 44) / 32000
 
 refs = {}
 for line in open(os.path.join(sys.argv[1], "refs.tsv")):
@@ -80,17 +89,17 @@ def app_text(raw):
 
 other = {"de": "es", "es": "de"}
 for path in sys.argv[2:]:
-    rows = [l.rstrip("\n").split("\t") for l in open(path) if l.count("\t") >= 2]
+    rows = [l.rstrip("\n").split("\t", 3) for l in open(path) if l.count("\t") >= 2 and not l.startswith("#")]
     if not rows:
         continue
-    ms = statistics.median(float(r[1]) for r in rows)
+    speed = 100 * sum(float(r[1]) for r in rows) / 1000 / sum(seconds[r[0]] for r in rows)
     name = os.path.basename(path).removesuffix(".tsv")
     if name.startswith("whisper"):
         hyp = {r[0]: app_text(r[3]) if len(r) > 3 else r[2] for r in rows}
         err = sum(edits(words(hyp[r[0]]), words(refs[r[0]])) for r in rows)
         total = sum(len(words(refs[r[0]])) for r in rows)
-        print(f"{name}\tWER {100 * err / total:.1f}%\t{ms / 1000:.2f} s\t{len(rows)}")
+        print(f"{name}\tWER {100 * err / total:.1f}%\ttime {speed:.0f}%\t{len(rows)}")
     else:
         # "de123" was translated from German: its reference is the Spanish "es123"
         score = statistics.mean(chrf(r[2], refs[other[r[0][:2]] + r[0][2:]]) for r in rows)
-        print(f"{name}\tchrF {score:.1f}\t{ms / 1000:.2f} s\t{len(rows)}")
+        print(f"{name}\tchrF {score:.1f}\ttime {speed:.0f}%\t{len(rows)}")

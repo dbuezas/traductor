@@ -133,7 +133,12 @@ public class ModelsActivity extends Activity {
         list.addView(box, lp);
 
         if (!expanded) return;
-        for (Models.Model m : Models.catalog) if (m.kind == kind) row(m);
+        for (Models.Model m : Models.catalog) {
+            if (m.kind != kind) continue;
+            // a model another one beats in quality and speed: only if it is on the phone already
+            if (m.hidden && !Models.isDownloaded(this, m) && !Models.isDownloading(m)) continue;
+            row(m);
+        }
         // found on Hugging Face, not tested by me
         boolean any = false;
         for (Models.Model m : Models.discovered) if (m.kind == kind) any = true;
@@ -259,10 +264,13 @@ public class ModelsActivity extends Activity {
         list.addView(t);
     }
 
-    /** "Precisión ●●●●○   Velocidad ●●●○○" */
+    /** "Precisión ●●●●○   Velocidad ●●●○○", and below the measured numbers */
     private TextView ratings(Models.Model m) {
-        TextView t = Ui.text(this, !m.tested() ? getString(R.string.untested)
-                : getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed), 13, Ui.MUTED, true);
+        String s = !m.tested() ? getString(R.string.untested)
+                : getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed);
+        if (m.quality > 0) s += "\n" + getString(m.kind == Models.Kind.WHISPER ? R.string.measured_whisper : R.string.measured_translator,
+                String.format(java.util.Locale.getDefault(), "%.1f", m.quality), m.time);
+        TextView t = Ui.text(this, s, 13, Ui.MUTED, true);
         t.setPadding(0, dp(3), 0, dp(1));
         return t;
     }
