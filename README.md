@@ -37,7 +37,15 @@ again; the 🔊 chip on each side sets how fast the phone reads to that person.
   Whisper model; a running pass is restarted when more speech comes. When the speaker stops,
   the running pass already has all the audio and becomes the final text, without another pass.
 - Sentences that are settled (two passes agree, or they ended well before the end of the audio)
-  go to the translator right away.
+  go to the translator right away, taking turns with the passes, so translation runs while the
+  person is still talking.
+- The engine (`Engine.java`) only produces text, and reports each utterance as an immutable copy.
+  Everything the phone says goes through one owner, `Speaker.java`: it reads translations in
+  order, sentence by sentence, as soon as the speaker stops, keeps how far each utterance has been
+  read, and never starts while someone is talking. ▶ on a bubble reads it now and skips older ones
+  that were still waiting.
+- Android does not say whether a voice is a man's or a woman's. Each voice reads a short sample
+  into a file once (nothing is heard), and its pitch decides (below 165 Hz: a man's voice).
 - The translator's fixed instructions are evaluated once and saved to a file, so they load
   instantly later.
 - Spanish translations are switched to Rioplatense "vos" with a word list (TranslateGemma does

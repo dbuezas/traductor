@@ -41,6 +41,7 @@ public class ModelsActivity extends Activity {
         tts = new TextToSpeech(this, st -> runOnUiThread(() -> {
             ttsReady = st == TextToSpeech.SUCCESS;
             render();
+            Voices.measure(this, Voices.langsInUse(this), this::render);   // "Woman 1", "Man 2"
         }));
     }
 
@@ -244,7 +245,7 @@ public class ModelsActivity extends Activity {
         int index = -1;
         for (int i = 0; i < voices.size(); i++) if (voices.get(i).getName().equals(chosen)) index = i;
         String current = !ttsReady ? "…" : voices.isEmpty() ? getString(R.string.voices_none)
-                : index < 0 ? getString(R.string.voice_auto) : Voices.label(this, voices.get(index), index);
+                : index < 0 ? getString(R.string.voice_auto) : Voices.label(this, voices.get(index), voices);
         texts.addView(Ui.text(this, current + (voices.isEmpty() ? "" : " · " + getString(R.string.voices_count, voices.size())), 14, Ui.MUTED, false));
         box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (!voices.isEmpty()) {   // tapping the card picks the voice
@@ -258,7 +259,7 @@ public class ModelsActivity extends Activity {
     private void pickVoice(Lang l, List<Voice> voices) {
         String[] labels = new String[voices.size() + 1];
         labels[0] = getString(R.string.voice_auto);
-        for (int i = 0; i < voices.size(); i++) labels[i + 1] = Voices.label(this, voices.get(i), i);
+        for (int i = 0; i < voices.size(); i++) labels[i + 1] = Voices.label(this, voices.get(i), voices);
         new AlertDialog.Builder(this, Ui.dialogTheme())
                 .setTitle(l.flag + "  " + l.label)
                 .setItems(labels, (d, i) -> {

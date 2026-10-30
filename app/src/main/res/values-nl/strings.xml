@@ -52,4 +52,8 @@
     <string name="show_hidden">Niet aanbevolen modellen tonen (%d)</string>
     <string name="hide_hidden">Niet aanbevolen modellen verbergen</string>
     <string name="measured_ram">%s GB RAM</string>
+    <string name="voice_female">Vrouw %d</string>
+    <string name="voice_male">Man %d</string>
+    <string name="no_male_voice">Geen mannenstem geïnstalleerd voor deze taal</string>
+    <string name="no_female_voice">Geen vrouwenstem geïnstalleerd voor deze taal</string>
 </resources>

@@ -16,8 +16,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -36,19 +34,16 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
  * Two people face each other with the phone between them. The bottom half is for person A,
  * the top half (upside down) for person B. Each half shows the whole conversation in its language.
  */
-public class MainActivity extends Activity implements Engine.Listener {
+public class MainActivity extends Activity implements Engine.Listener, Speaker.Host {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private Engine engine;
-    private TextToSpeech tts;
-    private boolean ttsReady;
-    private int speaking;
+    private Speaker speaker;
 
     private Lang langA, langB;
     private Panel panelA, panelB;
@@ -58,9 +53,9 @@ public class MainActivity extends Activity implements Engine.Listener {
     private boolean turnMode;
     private Engine.Session currentTurn;   // the turn whose button is held
     private Panel heldPanel;              // the panel whose talk button is held
-    private Engine.Utt recordingUtt;      // the utterance being recorded now (auto mode)
+    private Engine.UttView recordingUtt;  // the utterance being recorded now
     private boolean voiceNow;             // voice in the mic right now
-    private String loadedWhisper, loadedLive, loadedTranslator;
+    private String loadedWhisper, loadedTranslator;
 
     /** One half of the screen. */
     private final class Panel {
@@ -68,12 +63,11 @@ public class MainActivity extends Activity implements Engine.Listener {
         final int accent, accentDark, tint;
         final LinearLayout list;
         final ScrollView scroll;
-        final TextView langChip, rateChip, stateChip, emptyHint, talkLabel;
+        final TextView langChip, rateChip, voiceChip, stateChip, emptyHint, talkLabel;
         final View meter;
         final LinearLayout talkButton;      // turn mode only
         final ImageView talkIcon;
         final Map<Integer, Bubble> rows = new HashMap<>();
-        boolean ttsSpeaking;
 
         Panel(LinearLayout root, boolean top) {
             this.top = top;
@@ -104,6 +98,12 @@ public class MainActivity extends Activity implements Engine.Listener {
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-2, -2);
             rlp.leftMargin = dp(8);
             header.addView(rateChip, rlp);
+            // a woman's or a man's voice for this person; tap to switch
+            voiceChip = Ui.pill(MainActivity.this, "", Ui.CARD, accentDark);
+            voiceChip.setOnClickListener(v -> switchVoice(this));
+            LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(-2, -2);
+            vlp.leftMargin = dp(8);
+            header.addView(voiceChip, vlp);
             header.addView(new View(MainActivity.this), new LinearLayout.LayoutParams(0, 1, 1));
             stateChip = Ui.text(MainActivity.this, "", 14, Ui.WHITE, true);
             stateChip.setPadding(dp(12), dp(6), dp(12), dp(6));
@@ -186,6 +186,7 @@ public class MainActivity extends Activity implements Engine.Listener {
             langChip.setText(lang().flag + "  " + lang().label + "  ▾");
             float r = rate();
             rateChip.setText("🔊 " + (r == (int) r ? String.valueOf((int) r) : String.valueOf(r)).replace('.', ',') + "×");
+            voiceChip.setText(Voices.symbol(MainActivity.this, speaker != null ? speaker.voiceFor(lang()) : null));
             setHeld(heldPanel == this);
             emptyHint.setText(lang().flag + "\n" + lang().label);
             emptyHint.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
@@ -202,17 +203,23 @@ public class MainActivity extends Activity implements Engine.Listener {
             stateChip.setVisibility(View.VISIBLE);
         }
 
+        int side() {
+            return this == panelA ? 0 : 1;
+        }
+
         /** Shows the utterance in this panel's language: own speech as original, the other's as translation. */
-        void show(Engine.Utt u) {
+        void show(Engine.UttView u) {
             Bubble b = rows.get(u.id);
-            if (u.dropped) {   // noise, nothing said, or cancelled
+            if (u.dropped()) {   // noise, nothing said, or cancelled
                 if (b != null) list.removeView(b.view);
                 rows.remove(u.id);
                 emptyHint.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
                 return;
             }
-            Lang said = u.lang != null ? u.lang : u.shownLang;   // null: not known yet
-            boolean own = said == lang();
+            Lang said = u.said();   // null: not known yet
+            // original on the speaker's side; on the other the translation, if it is in this
+            // side's language (after a language change, old bubbles keep their original)
+            boolean own = said == lang() || (u.target != null && u.target != lang());
             if (b == null) {
                 b = new Bubble();
                 rows.put(u.id, b);
@@ -279,7 +286,7 @@ public class MainActivity extends Activity implements Engine.Listener {
         }
 
         /** own: spoken in this panel's language; null: language not known yet (neutral, centered). */
-        void update(Engine.Utt u, Boolean own, Panel p) {
+        void update(Engine.UttView u, Boolean own, Panel p) {
             float r = dp(20), tail = dp(6);
             boolean mine = Boolean.TRUE.equals(own);
             Lang l = p.lang();
@@ -288,7 +295,7 @@ public class MainActivity extends Activity implements Engine.Listener {
                 setGravity(Gravity.CENTER_HORIZONTAL);
                 text.setVisibility(View.GONE);
                 play.setVisibility(View.GONE);
-                setMeta(u.recording ? "🎙  " + l.listening : "⋯  " + l.transcribing, Ui.MUTED, !u.recording);
+                setMeta(u.recording() ? "🎙  " + l.listening : "⋯  " + l.transcribing, Ui.MUTED, !u.recording());
                 return;
             }
             int bg = mine ? p.accent : Ui.CARD;
@@ -302,7 +309,7 @@ public class MainActivity extends Activity implements Engine.Listener {
             // settled text solid, text that may still change faded; then, where the text will
             // continue: a bar for each sentence heard but not translated yet, and "…" while
             // there is audio still to transcribe
-            String settled = mine ? u.committed : u.translationDone();
+            String settled = mine ? u.committed() : u.translated();
             String pending = mine ? u.tail : u.translating;
             SpannableStringBuilder s = new SpannableStringBuilder(settled);
             if (!pending.isEmpty()) {
@@ -312,7 +319,7 @@ public class MainActivity extends Activity implements Engine.Listener {
                 s.setSpan(new ForegroundColorSpan(pendingFg), from, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
             if (!mine) {
-                int queued = u.pieces.size() - u.translations.size() - (u.translating.isEmpty() ? 0 : 1);
+                int queued = Math.max(0, u.pieces.size() - u.translations.size() - (u.translating.isEmpty() ? 0 : 1));
                 for (int i = 0; i < queued; i++) {
                     if (s.length() > 0) s.append(' ');
                     int from = s.length();
@@ -320,7 +327,8 @@ public class MainActivity extends Activity implements Engine.Listener {
                     s.setSpan(new BarSpan(pendingFg), from, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
             }
-            boolean moreToHear = !u.ended && (mine ? !u.recording : true);
+            boolean ended = u.phase == Engine.Phase.DONE;
+            boolean moreToHear = !ended && (mine ? !u.recording() : true);
             if (moreToHear && s.length() > 0) {
                 int from = s.length();
                 s.append(" …");
@@ -331,24 +339,25 @@ public class MainActivity extends Activity implements Engine.Listener {
             text.setVisibility(s.length() == 0 ? View.GONE : View.VISIBLE);
 
             // what is still happening, in the reader's language
-            boolean transcribing = !u.recording && !u.ended;
-            boolean translating = u.ended && u.translations.size() < u.pieces.size();
-            String m = u.recording ? "🎙  " + l.listening
+            boolean transcribing = u.phase == Engine.Phase.TRANSCRIBING;
+            boolean translating = ended && !u.complete();
+            String m = u.recording() ? "🎙  " + l.listening
                     : transcribing && mine ? "⋯  " + l.transcribing
                     : transcribing || translating ? "⋯  " + l.translating : "";
             setMeta(m, mine ? 0xCCFFFFFF : Ui.MUTED, transcribing || translating);
 
             // a finished translation can be played, and paused while it plays
-            boolean playable = !mine && u.ended && !translating && !u.translationDone().isEmpty();
+            boolean playable = !mine && u.complete() && !u.translated().isEmpty();
             play.setVisibility(playable ? View.VISIBLE : View.GONE);
             if (playable) {
-                boolean playing = p.ttsSpeaking && u.id == speakingId;
+                boolean playing = speaker.playingUtt() == u.id && speaker.playingSide() == p.side();
                 play.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
                 play.setImageTintList(ColorStateList.valueOf(Ui.WHITE));
                 play.setBackground(Ui.ripple(Ui.round(p.accent, dp(100)), 0x33FFFFFF));
+                // decided at the tap, not when the bubble was drawn
                 play.setOnClickListener(v -> {
-                    if (playing) tts.stop();
-                    else speak(u, p);
+                    if (speaker.playingUtt() == u.id) speaker.pause();
+                    else speaker.replay(u);
                 });
             }
         }
@@ -382,10 +391,9 @@ public class MainActivity extends Activity implements Engine.Listener {
         private ObjectAnimator pulse;
     }
 
-    private int speakingId = -1;
     private static final float[] RATES = {0.75f, 1f, 1.25f, 1.5f};
     private String lastStatus = "";
-    private final Map<Integer, Engine.Utt> utts = new HashMap<>();
+    private final Map<Integer, Engine.UttView> utts = new HashMap<>();   // shown, by id
 
     @Override
     protected void onCreate(Bundle state) {
@@ -402,20 +410,11 @@ public class MainActivity extends Activity implements Engine.Listener {
         Native.setCacheDir(cache.getPath());
         engine = new Engine(this, langA, langB);
         engine.setDebugDir(new File(getFilesDir(), "debug"));
-        applyModeUi();
-        tts = new TextToSpeech(this, s -> ttsReady = s == TextToSpeech.SUCCESS);
-        tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-            @Override public void onStart(String id) {
-                ui.post(() -> {
-                    speaking++;
-                    engine.setMuted(true);
-                    setSpeaking(id, true);
-                });
-            }
-            @Override public void onDone(String id) { ui.post(() -> doneSpeaking(id)); }
-            @Override public void onError(String id) { ui.post(() -> doneSpeaking(id)); }
-            @Override public void onStop(String id, boolean interrupted) { ui.post(() -> doneSpeaking(id)); }
+        speaker = new Speaker(this, this, () -> {
+            updateAllTexts();
+            Voices.measure(this, Voices.langsInUse(this), this::updateAllTexts);   // ♀ / ♂
         });
+        applyModeUi();
 
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 1);
@@ -443,9 +442,9 @@ public class MainActivity extends Activity implements Engine.Listener {
         int light = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
         if (Build.VERSION.SDK_INT >= 30) getWindow().getInsetsController().setSystemBarsAppearance(Ui.dark ? 0 : light, light);
 
-        List<Engine.Utt> list = new ArrayList<>(utts.values());
+        List<Engine.UttView> list = new ArrayList<>(utts.values());
         list.sort((x, y) -> Integer.compare(x.id, y.id));
-        for (Engine.Utt u : list) {
+        for (Engine.UttView u : list) {
             panelA.show(u);
             panelB.show(u);
         }
@@ -551,22 +550,34 @@ public class MainActivity extends Activity implements Engine.Listener {
         }, 500);
     }
 
-    private void doneSpeaking(String id) {
-        setSpeaking(id, false);
-        speaking = Math.max(0, speaking - 1);
-        // short delay so the room echo of the last word is not taken as speech
-        if (speaking == 0) ui.postDelayed(() -> { if (speaking == 0) engine.setMuted(false); }, 300);
+    // ---- Speaker.Host ----
+
+    @Override
+    public int sideOf(Lang l) {
+        return l == langA ? 0 : l == langB ? 1 : -1;
     }
 
-    /** Utterance ids are "<id>:<a|b>": the panel that hears the translation. */
-    private void setSpeaking(String id, boolean on) {
-        String[] parts = id.split(":");
-        Panel p = parts[1].equals("a") ? panelA : panelB;
-        p.ttsSpeaking = on;
-        int uid = Integer.parseInt(parts[0]);
-        speakingId = on ? uid : -1;
-        Engine.Utt u = utts.get(uid);
-        if (u != null) p.show(u);   // its 🔊 mark
+    @Override
+    public float rate(int side) {
+        return (side == 0 ? panelA : panelB).rate();
+    }
+
+    @Override
+    public void setMuted(boolean muted) {
+        engine.setMuted(muted);
+    }
+
+    private int shownPlaying = -1;   // the utterance whose ⏸ is shown
+
+    @Override
+    public void onSpeakingChanged() {
+        for (int id : new int[]{shownPlaying, speaker.playingUtt()}) {
+            Engine.UttView u = utts.get(id);
+            if (u == null) continue;
+            panelA.show(u);
+            panelB.show(u);
+        }
+        shownPlaying = speaker.playingUtt();
         refreshStates();
     }
 
@@ -577,27 +588,24 @@ public class MainActivity extends Activity implements Engine.Listener {
         ui.removeCallbacks(keepListeningTick);
         ui.post(keepListeningTick);
         File w = Models.selectedFile(this, Models.Kind.WHISPER);
-        File live = null;   // no small live model any more: the main model runs pass after pass
         File t = Models.selectedFile(this, Models.Kind.TRANSLATOR);
-        String ws = w == null ? null : w.getPath(), ls = live == null ? null : live.getPath(), ts = t == null ? null : t.getPath();
+        String ws = w == null ? null : w.getPath(), ts = t == null ? null : t.getPath();
         boolean wChanged = ws != null && !ws.equals(loadedWhisper);
-        boolean lChanged = ls != null && !ls.equals(loadedLive);
         boolean tChanged = ts != null && !ts.equals(loadedTranslator);
-        if (wChanged || lChanged || tChanged) {
+        if (wChanged || tChanged) {
             Models.Model tm = Models.selectedModel(this, Models.Kind.TRANSLATOR);
-            engine.load(wChanged ? w : null, lChanged ? live : null, tChanged ? t : null, tm != null && tm.general);
+            engine.load(wChanged ? w : null, tChanged ? t : null, tm != null && tm.general);
         }
-        if (ls == null && loadedLive != null) engine.unloadLive();
         loadedWhisper = ws;
-        loadedLive = ls;
         loadedTranslator = ts;
+        updateAllTexts();   // a voice may have been picked in the settings
         if (ws == null || ts == null) status.setText(R.string.status_missing_models);
     }
 
     @Override
     protected void onDestroy() {
         engine.stop();
-        tts.shutdown();
+        speaker.shutdown();
         super.onDestroy();
     }
 
@@ -653,9 +661,7 @@ public class MainActivity extends Activity implements Engine.Listener {
         turnMode = on;
         Models.prefs(this).edit().putBoolean("turnMode", on).apply();
         engine.cancelAll();
-        if (tts != null) tts.stop();
-        speaking = 0;
-        engine.setMuted(false);
+        speaker.clear();
         currentTurn = null;
         heldPanel = null;
         paused = false;
@@ -683,9 +689,7 @@ public class MainActivity extends Activity implements Engine.Listener {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 1);
             return false;
         }
-        tts.stop();   // talking over the phone interrupts it
-        speaking = 0;
-        engine.setMuted(false);
+        speaker.interruptForTalk();   // talking over the phone interrupts it
         currentTurn = engine.startTurn(p.lang());
         heldPanel = p;
         refreshStates();
@@ -704,12 +708,10 @@ public class MainActivity extends Activity implements Engine.Listener {
         // who is being listened to: the held side (turns), or the side of the detected language (auto)
         Lang talking = null;
         if (heldPanel != null) talking = heldPanel.lang();
-        else if (recordingUtt != null && recordingUtt.recording && !recordingUtt.dropped) {
-            talking = recordingUtt.lang != null ? recordingUtt.lang : recordingUtt.shownLang;
-        }
+        else if (recordingUtt != null) talking = recordingUtt.said();
         for (Panel p : new Panel[]{panelA, panelB}) {
             Lang l = p.lang();
-            if (p.ttsSpeaking) p.setState("🔊", p.accent);
+            if (speaker.playingSide() == p.side()) p.setState("🔊", p.accent);
             else if (talking == l) p.setState("●  " + l.listening, Ui.RED);
             else if (listening && !turnMode && talking == null) p.setState("●  " + l.listening, voiceNow ? Ui.RED : Ui.FAINT);
             else p.setState(null, 0);
@@ -755,8 +757,7 @@ public class MainActivity extends Activity implements Engine.Listener {
         ui.post(() -> {
             voiceNow = voice;
             // the meter of the side being listened to; both sides while the language is unknown
-            Lang talking = heldPanel != null ? heldPanel.lang()
-                    : recordingUtt != null && recordingUtt.recording ? (recordingUtt.lang != null ? recordingUtt.lang : recordingUtt.shownLang) : null;
+            Lang talking = heldPanel != null ? heldPanel.lang() : recordingUtt != null ? recordingUtt.said() : null;
             for (Panel p : new Panel[]{panelA, panelB}) {
                 boolean mine = talking == null ? engine.isListening() && heldPanel == null : talking == p.lang();
                 p.meter.animate().scaleX(mine ? level : 0).setDuration(90).start();
@@ -768,44 +769,46 @@ public class MainActivity extends Activity implements Engine.Listener {
     }
 
     @Override
-    public void onUtt(Engine.Utt u) {
+    public void onUtt(Engine.UttView u) {
         ui.post(() -> {
-            utts.put(u.id, u);
-            if (u.recording && !u.dropped) recordingUtt = u;
-            else if (recordingUtt == u) recordingUtt = null;
+            if (u.dropped()) utts.remove(u.id);
+            else utts.put(u.id, u);
+            if (u.recording()) recordingUtt = u;
+            else if (recordingUtt != null && recordingUtt.id == u.id) recordingUtt = null;
             panelA.show(u);
             panelB.show(u);
+            speaker.update(u);
             refreshStates();
         });
     }
 
-    @Override
-    public void onTranslated(Engine.Utt u, String piece) {
-        ui.post(() -> {
-            Panel listener = u.lang != langA ? panelA : panelB;
-            if (!ttsReady || piece.isEmpty()) return;
-            setTtsLanguage(listener.lang());
-            tts.setSpeechRate(listener.rate());
-            tts.speak(piece, TextToSpeech.QUEUE_ADD, null, u.id + ":" + (listener == panelA ? "a" : "b"));
-        });
+    private void updateAllTexts() {
+        panelA.updateTexts();
+        panelB.updateTexts();
     }
 
-    /** Plays one translation now (the play button), interrupting whatever is being spoken. */
-    private void speak(Engine.Utt u, Panel p) {
-        if (!ttsReady) return;
-        setTtsLanguage(p.lang());
-        tts.setSpeechRate(p.rate());
-        tts.speak(u.translationDone(), TextToSpeech.QUEUE_FLUSH, null, u.id + ":" + (p == panelA ? "a" : "b"));
-    }
-
-    /** Sets the voice for a language: the one picked in settings, else the default for it. */
-    private void setTtsLanguage(Lang lang) {
-        Voice v = Voices.find(this, tts, lang);
-        if (v != null && tts.setVoice(v) == TextToSpeech.SUCCESS) return;
-        Locale l = lang.locale;
-        int r = tts.setLanguage(l);
-        if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
-            tts.setLanguage(new Locale(l.getLanguage()));
+    /**
+     * Switches this side between a woman's and a man's voice: the first voice of the other kind,
+     * preferring the same country and offline ones. Plays a sample.
+     */
+    private void switchVoice(Panel p) {
+        if (!speaker.isReady()) return;
+        Lang l = p.lang();
+        Voice now = speaker.voiceFor(l);
+        String want = "m".equals(Voices.gender(this, now)) ? "f" : "m";
+        Voice pick = null;
+        for (Voice v : Voices.forLang(speaker.tts(), l)) {
+            if (!want.equals(Voices.gender(this, v))) continue;
+            boolean sameCountry = now != null && v.getLocale().getCountry().equals(now.getLocale().getCountry());
+            if (pick == null || (sameCountry && !pick.getLocale().getCountry().equals(now.getLocale().getCountry()))) pick = v;
         }
+        if (pick == null) {
+            android.widget.Toast.makeText(this, want.equals("m") ? R.string.no_male_voice : R.string.no_female_voice,
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Voices.choose(this, l, pick);
+        p.updateTexts();
+        speaker.sample(l.holdToTalk, l, p.side());
     }
 }

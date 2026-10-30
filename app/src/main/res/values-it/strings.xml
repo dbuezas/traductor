@@ -52,4 +52,8 @@
     <string name="show_hidden">Mostra i modelli non consigliati (%d)</string>
     <string name="hide_hidden">Nascondi i modelli non consigliati</string>
     <string name="measured_ram">%s GB di RAM</string>
+    <string name="voice_female">Donna %d</string>
+    <string name="voice_male">Uomo %d</string>
+    <string name="no_male_voice">Nessuna voce maschile installata per questa lingua</string>
+    <string name="no_female_voice">Nessuna voce femminile installata per questa lingua</string>
 </resources>

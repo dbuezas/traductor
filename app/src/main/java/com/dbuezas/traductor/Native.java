@@ -13,9 +13,9 @@ final class Native {
     /** While true, the running transcription/translation stops as soon as it can. */
     static native void setAbort(boolean abort);
 
-    static final int MAIN = 0, LIVE = 1;
+    static final int MAIN = 0;   // the native side has two whisper slots; the app uses one
 
-    /** Loads a whisper model into a slot (MAIN or LIVE); a null path unloads the slot. */
+    /** Loads a whisper model into a slot; a null path unloads the slot. */
     static native boolean loadWhisper(int slot, String path);
 
     /** Language of the audio of the last transcribe() call: whichever of the two is more likely. */

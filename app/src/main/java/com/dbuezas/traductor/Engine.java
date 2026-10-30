@@ -11,7 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Listens to the mic, cuts speech into utterances (at pauses, or by the talk button in turn mode),
@@ -22,8 +25,10 @@ import java.util.List;
  * has all the audio, and it becomes the final one without waiting for the pause to be confirmed.
  * A sentence (whisper segment) is settled when two passes in a row agree on it, or when it ended
  * well before the audio heard so far: its audio is not transcribed again, and it goes to the
- * translator right away. At the end of the utterance the rest is settled, and the whole
- * translation is spoken.
+ * translator right away.
+ *
+ * The engine only produces text. It reports every change as an immutable {@link UttView}; what is
+ * read aloud, and when, is decided by {@link Speaker} on the UI thread.
  */
 final class Engine {
     private static final String TAG = "traductor";
@@ -43,38 +48,130 @@ final class Engine {
     private static final int SETTLED_AFTER_MS = 1500;
     private static final int MAX_CHARS_PER_SECOND = 30;   // fast speech is ~15-20
 
+    enum Phase {
+        RECORDING,      // audio still coming in
+        TRANSCRIBING,   // the speaker stopped; the last part is being transcribed
+        DONE,           // all text is settled (translations may still be running)
+        DROPPED         // nothing was said, or thrown away: the UI removes it
+    }
+
+    /**
+     * One utterance. The worker thread writes the text; the audio thread writes the phase. Shared
+     * fields are only touched in synchronized methods, and the UI only sees {@link #view()} copies.
+     */
     static final class Utt {
         final int id;
-        Lang lang;                 // null until detected
-        Lang shownLang;            // a guess, to show early text before detection
-        // original text: settled part + the part that may still change
-        volatile String committed = "";
-        volatile String tail = "";
-        int committedSamples;      // audio before this is settled
+        // worker thread only
+        volatile int committedSamples;   // audio before this is settled (read by the audio thread)
         int passCovered;           // buffer length the last finished pass transcribed
         List<String> prevTail = new ArrayList<>();   // last pass's unsettled segments
-        // translation: one per settled piece, plus the one being generated now
-        // read by the UI thread while the worker adds to them
-        final List<String> pieces = new java.util.concurrent.CopyOnWriteArrayList<>();
-        final List<String> translations = new java.util.concurrent.CopyOnWriteArrayList<>();
-        volatile String translating = "";
-        volatile boolean recording = true;   // audio still coming in
-        volatile boolean ended, spoken, dropped;
-        Utt prev, next;   // the utterances before and after, spoken in this order
-        int toSpeak;      // translations handed to the voice so far
-        int spokenChars;  // of translation number toSpeak: the sentences spoken while it was generated
-        volatile boolean cancelled;   // thrown away: its work is skipped
 
-        final Session session;
+        private Phase phase = Phase.RECORDING;
+        private Lang lang;         // null until detected
+        private Lang shownLang;    // a guess, to show early text before detection
+        private Lang target;       // set with lang: the language it is translated into
+        private final List<String> pieces = new ArrayList<>();             // settled sentences
+        private final Map<Integer, String> translations = new HashMap<>(); // piece index -> translation
+        private String tail = "";           // text that may still change
+        private String translating = "";    // the translation being generated (of the first missing piece)
 
-        Utt(int id, Session session) {
+        Utt(int id) {
             this.id = id;
-            this.session = session;
         }
 
-        String translationDone() {
-            return String.join(" ", translations);
+        synchronized Phase phase() { return phase; }
+        synchronized Lang lang() { return lang; }
+        synchronized Lang target() { return target; }
+        synchronized String committed() { return String.join(" ", pieces); }
+        synchronized String piece(int i) { return pieces.get(i); }
+        synchronized boolean dropped() { return phase == Phase.DROPPED; }
+
+        synchronized void setLang(Lang l, Lang to) {
+            lang = l;
+            target = to;
         }
+
+        synchronized void setGuess(Lang l, String text) {
+            shownLang = l;
+            tail = text;
+        }
+
+        /** Adds a settled sentence; returns its index. */
+        synchronized int addPiece(String p) {
+            pieces.add(p);
+            return pieces.size() - 1;
+        }
+
+        synchronized boolean isPiece(String normalized) {
+            for (String p : pieces) if (norm(p).equals(normalized)) return true;
+            return false;
+        }
+
+        synchronized void setTail(String t) { tail = t; }
+        synchronized void setTranslating(String t) { translating = t; }
+
+        synchronized void setTranslation(int index, String t) {
+            translations.put(index, t);
+            translating = "";
+        }
+
+        /** RECORDING -> TRANSCRIBING; false if it was dropped meanwhile. */
+        synchronized boolean stopRecording() {
+            if (phase != Phase.RECORDING) return false;
+            phase = Phase.TRANSCRIBING;
+            return true;
+        }
+
+        /** All text is settled: DONE, or DROPPED if nothing was said. */
+        synchronized void finish() {
+            if (phase == Phase.DROPPED) return;
+            tail = "";
+            phase = pieces.isEmpty() ? Phase.DROPPED : Phase.DONE;
+        }
+
+        /** False if it was dropped already. */
+        synchronized boolean drop() {
+            if (phase == Phase.DROPPED) return false;
+            phase = Phase.DROPPED;
+            return true;
+        }
+
+        synchronized UttView view() {
+            List<String> done = new ArrayList<>();   // translations of pieces 0..n-1, without gaps
+            while (translations.containsKey(done.size())) done.add(translations.get(done.size()));
+            return new UttView(id, phase, lang, shownLang, target, new ArrayList<>(pieces), done, tail, translating);
+        }
+    }
+
+    /** A consistent, immutable copy of an utterance, for the UI thread. */
+    static final class UttView {
+        final int id;
+        final Phase phase;
+        final Lang lang, shownLang, target;
+        final List<String> pieces, translations;   // translations: of the first pieces, in order
+        final String tail, translating;
+
+        UttView(int id, Phase phase, Lang lang, Lang shownLang, Lang target, List<String> pieces,
+                List<String> translations, String tail, String translating) {
+            this.id = id;
+            this.phase = phase;
+            this.lang = lang;
+            this.shownLang = shownLang;
+            this.target = target;
+            this.pieces = Collections.unmodifiableList(pieces);
+            this.translations = Collections.unmodifiableList(translations);
+            this.tail = tail;
+            this.translating = translating;
+        }
+
+        boolean recording() { return phase == Phase.RECORDING; }
+        boolean dropped() { return phase == Phase.DROPPED; }
+        /** All text settled and translated. */
+        boolean complete() { return phase == Phase.DONE && translations.size() == pieces.size(); }
+        String committed() { return String.join(" ", pieces); }
+        String translated() { return String.join(" ", translations); }
+        /** The language it was said in, or the current guess; null if not known yet. */
+        Lang said() { return lang != null ? lang : shownLang; }
     }
 
     interface Listener {
@@ -84,59 +181,37 @@ final class Engine {
         /** Mic level 0..1 every 100 ms while listening; speaking: voice detected right now. */
         void onLevel(float level, boolean speaking);
 
-        void onUtt(Utt u);           // created or changed (called on the worker/audio thread)
-
-        /** The next translated piece of a finished utterance, to be spoken (pieces come in order). */
-        void onTranslated(Utt u, String piece);
+        /** An utterance was created or changed (called on the worker or audio thread). */
+        void onUtt(UttView u);
     }
 
     private final Listener listener;
     private volatile Lang langA, langB;
     private volatile boolean muted;
-    private final Thread workerThread;
-
-    // worker queue: finals first (in order), then at most one pending partial
-    private final ArrayDeque<Object[]> finals = new ArrayDeque<>();
-    private Object[] pendingPartial;
-    private boolean busy;
-    private String stage = "";      // what the worker is doing: "partial-asr", "partial-mt", "final", "load"
-    private boolean aborted;
-    private Utt running;            // utterance of the job the worker runs now (null for model jobs)
-    private int runningCovers;
-    private Object[] runningJob;      // a running pass: how much of the utterance buffer it transcribes
-
-    private volatile boolean whisperReady, translatorReady;
-    private Lang lastLang;           // language of the last utterance, the first guess for the next
-    private int nextId = 1;
 
     Engine(Listener listener, Lang a, Lang b) {
         this.listener = listener;
         this.langA = a;
         this.langB = b;
-        workerThread = new Thread(this::workerLoop, "worker");
-        workerThread.start();
+        new Thread(this::workerLoop, "worker").start();
     }
 
     void setLangs(Lang a, Lang b) {
         langA = a;
         langB = b;
-        enqueueFinal(new Object[]{"prepare"});
+        enqueue(Job.prepare());
     }
 
     /**
      * Loads models on the worker thread. Null files are left as they are.
-     * generalTranslator: the translator is a general Gemma, not TranslateGemma.
+     * general: the translator is a general Gemma, not TranslateGemma.
      */
-    void load(File whisper, File live, File translator, boolean generalTranslator) {
-        enqueueFinal(new Object[]{"load", whisper, live, translator, generalTranslator});
+    void load(File whisper, File translator, boolean general) {
+        enqueue(Job.load(whisper, translator, general));
     }
 
     private volatile boolean generalTranslator;
-
-    /** Unloads the live model (none selected). */
-    void unloadLive() {
-        enqueueFinal(new Object[]{"unload-live"});
-    }
+    private volatile boolean whisperReady, translatorReady;
 
     boolean isReady() {
         return whisperReady && translatorReady;
@@ -144,22 +219,30 @@ final class Engine {
 
     /** Nothing loading, running or waiting (tests start only then). */
     synchronized boolean isIdle() {
-        return !busy && finals.isEmpty() && pendingPartial == null;
+        return running == null && queue.isEmpty() && pendingPartial == null;
     }
 
+    /** The phone is talking: the mic is ignored (auto mode). */
     void setMuted(boolean m) {
         muted = m;
     }
+
+    private void emit(Utt u) {
+        listener.onUtt(u.view());
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // sessions
 
     /**
      * One listening run: an "auto" run (until stop()) or one turn (until endTurn()). All its
      * state lives here, so an old run can never touch a newer one.
      */
-    final class Session {
+    static final class Session {
         final File wav;        // test input instead of the mic, or null
         final Lang turn;       // turn mode: everything is one utterance in this language
         volatile boolean active = true;      // still recording
-        volatile boolean cancelled;          // thrown away: its work is dropped
+        volatile boolean cancelled;          // thrown away: its unfinished utterance is dropped
         Thread thread;
 
         Session(File wav, Lang turn) {
@@ -169,6 +252,8 @@ final class Engine {
     }
 
     private Session session;
+    private int nextId = 1;
+    private Lang lastLang;           // language of the last utterance, the first guess for the next
 
     synchronized boolean isListening() {
         return session != null && session.active;
@@ -186,7 +271,10 @@ final class Engine {
 
     /** wav: for testing, plays a 16 kHz mono 16-bit WAV file in real time instead of the mic. */
     synchronized Session start(File wav, Lang turn) {
-        stop();
+        // a turn still in its short tail after the button was released ends normally; anything
+        // else that is recording is stopped
+        if (session != null && session.turn != null) session.active = false;
+        else stop();
         Session s = new Session(wav, turn);
         session = s;
         s.thread = new Thread(() -> audioLoop(s), "audio");
@@ -209,7 +297,7 @@ final class Engine {
         session = null;
         if (s.active) {
             s.active = false;
-            s.cancelled = true;   // the audio loop discards its unfinished utterance
+            s.cancelled = true;
             s.thread.interrupt();
         }
     }
@@ -217,12 +305,26 @@ final class Engine {
     /** Stops listening and throws away all unfinished work, waiting or running (mode change). */
     synchronized void cancelAll() {
         stop();
-        for (Object[] job : finals) if (job.length > 1 && job[1] instanceof Utt) discard((Utt) job[1]);
-        finals.removeIf(job -> job.length > 1 && job[1] instanceof Utt);
-        if (pendingPartial != null) discard((Utt) pendingPartial[1]);
+        for (Job j : queue) if (j.u != null) discard(j.u);
+        queue.removeIf(j -> j.u != null);
+        if (pendingPartial != null) discard(pendingPartial.u);
         pendingPartial = null;
-        if (running != null) discard(running);
+        if (running != null && running.u != null) discard(running.u);
     }
+
+    private synchronized int nextId() {
+        return nextId++;
+    }
+
+    /** Drops an utterance that will not be finished (too short, cancelled, failed). */
+    private synchronized void discard(Utt u) {
+        if (!u.drop()) return;
+        if (running != null && running.u == u) abortRunning();
+        emit(u);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // audio
 
     /** Reads one chunk from the test file at real-time speed; false at the end of the file. */
     private boolean readWav(java.io.InputStream in, float[] chunk) throws java.io.IOException, InterruptedException {
@@ -234,9 +336,6 @@ final class Engine {
         Thread.sleep(chunk.length * 1000L / RATE);
         return true;
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // audio
 
     @SuppressLint("MissingPermission")
     private void audioLoop(Session s) {
@@ -304,9 +403,9 @@ final class Engine {
                 if (s.turn != null) {             // turn mode: the button decides the end, keep everything
                     if (buf == null) {
                         buf = new FloatBuf();
-                        utt = link(new Utt(nextId(), s));
-                        utt.lang = s.turn;
-                        listener.onUtt(utt);
+                        utt = new Utt(nextId());
+                        utt.setLang(s.turn, other(s.turn));
+                        emit(utt);
                         lastPartial = System.currentTimeMillis();   // utterance start
                     }
                     buf.add(chunk);
@@ -342,8 +441,8 @@ final class Engine {
                         buf = new FloatBuf();
                         for (float[] p : preroll) buf.add(p);
                         preroll.clear();
-                        utt = link(new Utt(nextId(), s));
-                        listener.onUtt(utt);   // shows that someone is being listened to
+                        utt = new Utt(nextId());
+                        emit(utt);   // shows that someone is being listened to
                         Log.i(TAG, "utt " + utt.id + " start at " + fmt(samplesSeen) + " (rms " + rms + ", noise " + noise + ")");
                         chunks = 0;
                         silenceRun = 0;
@@ -400,36 +499,14 @@ final class Engine {
 
     /** The utterance's audio is complete: queue its final pass. */
     private void handOver(Utt u, float[] pcm, int speechEnd) {
-        u.recording = false;
-        listener.onUtt(u);
-        enqueueFinal(new Object[]{"final", u, pcm, speechEnd});
-        maybeSpeak(u);   // the speaker stopped: what is translated already can be spoken now
+        if (!u.stopRecording()) return;
+        emit(u);
+        enqueue(Job.fin(u, pcm, speechEnd));
     }
 
-    private synchronized int nextId() {
-        return nextId++;
-    }
-
-    /** Removes an utterance that will not be finished (too short, cancelled, phone talking). */
-    private synchronized void discard(Utt u) {
-        if (u.cancelled) return;
-        u.cancelled = true;
-        u.recording = false;
-        u.ended = true;
-        u.dropped = true;
-        if (running == u) abortRunning();
-        listener.onUtt(u);
-        if (u.next != null) maybeSpeak(u.next);   // it may have been waiting for this one
-    }
-
-    private Utt lastUtt;
-
-    /** Chains a new utterance after the last one, so their translations are spoken in order. */
-    private synchronized Utt link(Utt u) {
-        u.prev = lastUtt;
-        if (lastUtt != null) lastUtt.next = u;
-        lastUtt = u;
-        return u;
+    private Lang other(Lang l) {
+        Lang a = langA, b = langB;
+        return l == a ? b : a;
     }
 
     private static String fmt(long samples) {
@@ -454,20 +531,54 @@ final class Engine {
     // ---------------------------------------------------------------------------------------------
     // worker
 
-    private synchronized void enqueueFinal(Object[] job) {
-        finals.addLast(job);
-        // a running pass that already heard all the speech is the final one in the making: keep it.
-        // Also one over long unsettled audio: it settles sentences the voice can start with, and
-        // the final pass then only needs the rest.
-        boolean keep = false;
-        if (job[0].equals("final") && stage.equals("partial-asr") && running == job[1]) {
-            Utt u = (Utt) job[1];
-            keep = runningCovers >= (Integer) job[3] || runningCovers - u.committedSamples > LONG_UNSETTLED_SAMPLES;
+    private enum Kind { LOAD, PREPARE, PARTIAL, FINAL, MT }
+
+    private static final class Job {
+        final Kind kind;
+        final Utt u;              // PARTIAL, FINAL, MT
+        final float[] pcm;        // PARTIAL, FINAL: the utterance's audio so far
+        final int speechEnd;      // FINAL: buffer length at the last speech
+        final int index;          // MT: the piece to translate
+        final File whisper, translator;   // LOAD
+        final boolean general;            // LOAD
+
+        private Job(Kind kind, Utt u, float[] pcm, int speechEnd, int index, File whisper, File translator, boolean general) {
+            this.kind = kind;
+            this.u = u;
+            this.pcm = pcm;
+            this.speechEnd = speechEnd;
+            this.index = index;
+            this.whisper = whisper;
+            this.translator = translator;
+            this.general = general;
         }
-        if ((stage.startsWith("partial") && !keep) || (stage.equals("prepare") && !job[0].equals("prepare"))) {
-            abortRunning();
-            if (stage.equals("prepare")) requeuePrepare();
+
+        static Job load(File w, File t, boolean general) { return new Job(Kind.LOAD, null, null, 0, 0, w, t, general); }
+        static Job prepare() { return new Job(Kind.PREPARE, null, null, 0, 0, null, null, false); }
+        static Job partial(Utt u, float[] pcm) { return new Job(Kind.PARTIAL, u, pcm, 0, 0, null, null, false); }
+        static Job fin(Utt u, float[] pcm, int speechEnd) { return new Job(Kind.FINAL, u, pcm, speechEnd, 0, null, null, false); }
+        static Job mt(Utt u, int index) { return new Job(Kind.MT, u, null, 0, index, null, null, false); }
+    }
+
+    // waiting jobs, and at most one waiting pass (newer audio replaces it)
+    private final ArrayDeque<Job> queue = new ArrayDeque<>();
+    private Job pendingPartial;
+    private Job running;              // the job the worker runs now
+    private boolean aborted;          // the running job was told to stop
+    private boolean lastWasPass;
+
+    private synchronized void enqueue(Job job) {
+        queue.addLast(job);
+        if (job.kind == Kind.FINAL && running != null && running.kind == Kind.PARTIAL) {
+            // a running pass that already heard all the speech is the final one in the making:
+            // keep it. Also one over long unsettled audio: it settles sentences the voice can start
+            // with, and the final pass then only needs the rest.
+            boolean keep = running.u == job.u && (running.pcm.length >= job.speechEnd
+                    || running.pcm.length - job.u.committedSamples > LONG_UNSETTLED_SAMPLES);
+            if (!keep) abortRunning();
         }
+        // reading the translator's instructions must not delay real work
+        if (job.kind != Kind.PREPARE && running != null && running.kind == Kind.PREPARE) abortRunning();
         notifyAll();
     }
 
@@ -479,63 +590,47 @@ final class Engine {
      * so it can settle sentences and the final pass does not get a very long audio.
      */
     private synchronized void offerPartial(Utt u, float[] pcm, int speechEnd) {
-        pendingPartial = new Object[]{"partial", u, pcm};
-        boolean longUnsettled = runningCovers - u.committedSamples > LONG_UNSETTLED_SAMPLES;
-        if (stage.equals("partial-asr") && running == u && runningCovers < speechEnd && !longUnsettled) abortRunning();
-        // reading the translator's instructions must not delay the voice: stop it, it runs again
-        // later. A translation is not stopped: it is what the voice will say first.
-        if (stage.equals("prepare")) {
-            abortRunning();
-            requeuePrepare();
+        pendingPartial = Job.partial(u, pcm);
+        if (running != null && running.kind == Kind.PARTIAL && running.u == u) {
+            boolean longUnsettled = running.pcm.length - u.committedSamples > LONG_UNSETTLED_SAMPLES;
+            if (running.pcm.length < speechEnd && !longUnsettled) abortRunning();
         }
+        // a translation is not stopped: it is what the voice will say first
+        if (running != null && running.kind == Kind.PREPARE) abortRunning();
         notifyAll();
     }
 
-    private boolean lastWasPass;
-
     /**
-     * Translations of utterances whose speaker stopped first, then finals (often free, reusing the
-     * last pass) and model loading. Then passes and
-     * translations take turns: while someone talks, the sentences settled so far get translated,
-     * so the voice can start as soon as the speaker stops, and it reads while the rest is done.
+     * Translations of utterances whose speaker stopped first: the voice needs them now, and the
+     * final pass for the rest runs while it reads them. Then finals (often free, reusing the last
+     * pass) and model loading. Then passes and translations take turns: while someone talks, the
+     * sentences settled so far get translated.
      */
-    private Object[] nextJob() {
-        // the speaker stopped: the voice needs the sentences settled already, right now; the final
-        // pass for the rest runs while it reads them
-        for (Object[] j : finals) {
-            if (!j[0].equals("mt") || ((Utt) j[1]).recording) continue;
-            finals.remove(j);
+    private Job nextJob() {
+        for (Job j : queue) {
+            if (j.kind != Kind.MT || j.u.phase() == Phase.RECORDING) continue;
+            queue.remove(j);
             return j;
         }
-        for (Object[] j : finals) {
-            if (j[0].equals("mt") || j[0].equals("prepare")) continue;
-            finals.remove(j);
-            if (j[0].equals("final") && pendingPartial != null && pendingPartial[1] == j[1]) pendingPartial = null;
+        for (Job j : queue) {
+            if (j.kind != Kind.FINAL && j.kind != Kind.LOAD) continue;
+            queue.remove(j);
+            if (j.kind == Kind.FINAL && pendingPartial != null && pendingPartial.u == j.u) pendingPartial = null;
             return j;
         }
-        if (pendingPartial != null && (!lastWasPass || finals.isEmpty())) {
-            Object[] j = pendingPartial;
+        if (pendingPartial != null && (!lastWasPass || queue.isEmpty())) {
+            Job j = pendingPartial;
             pendingPartial = null;
             lastWasPass = true;
             return j;
         }
         lastWasPass = false;
-        return finals.removeFirst();
-    }
-
-    /** Puts an aborted "prepare" back at the end of the queue, once. */
-    private void requeuePrepare() {
-        for (Object[] j : finals) if (j[0].equals("prepare")) return;
-        finals.addLast(new Object[]{"prepare"});
+        return queue.removeFirst();
     }
 
     private void abortRunning() {
         aborted = true;
         Native.setAbort(true);
-    }
-
-    private synchronized void setStage(String s) {
-        stage = s;
     }
 
     private synchronized boolean wasAborted() {
@@ -544,9 +639,9 @@ final class Engine {
 
     private void workerLoop() {
         while (true) {
-            Object[] job;
+            Job job;
             synchronized (this) {
-                while (finals.isEmpty() && pendingPartial == null) {
+                while (queue.isEmpty() && pendingPartial == null) {
                     try {
                         wait();
                     } catch (InterruptedException e) {
@@ -554,12 +649,8 @@ final class Engine {
                     }
                 }
                 job = nextJob();
-                busy = true;
+                running = job;
                 aborted = false;
-                running = job.length > 1 && job[1] instanceof Utt ? (Utt) job[1] : null;
-                runningJob = job;
-                stage = job[0].equals("partial") ? "partial-asr" : (String) job[0];
-                runningCovers = job[0].equals("partial") ? ((float[]) job[2]).length : 0;
                 Native.setAbort(false);
             }
             try {
@@ -567,59 +658,60 @@ final class Engine {
             } catch (Throwable t) {
                 Log.e(TAG, "job failed", t);
                 listener.onStatus(R.string.status_error, String.valueOf(t.getMessage()));
+                if (job.u != null) discard(job.u);   // never leave an utterance waiting forever
             }
             synchronized (this) {
-                busy = false;
-                stage = "";
                 running = null;
             }
         }
     }
 
-    private void run(Object[] job) {
-        switch ((String) job[0]) {
-            case "load": {
-                File w = (File) job[1], live = (File) job[2], t = (File) job[3];
-                if (w != null) {
+    private void run(Job job) {
+        switch (job.kind) {
+            case LOAD:
+                if (job.whisper != null) {
                     listener.onStatus(R.string.status_loading_whisper);
-                    whisperReady = Native.loadWhisper(Native.MAIN, w.getAbsolutePath());
+                    whisperReady = Native.loadWhisper(Native.MAIN, job.whisper.getAbsolutePath());
                 }
-                if (t != null) {
+                if (job.translator != null) {
                     listener.onStatus(R.string.status_loading_translator);
-                    generalTranslator = (Boolean) job[4];
-                    translatorReady = Native.loadTranslator(t.getAbsolutePath());
+                    generalTranslator = job.general;
+                    translatorReady = Native.loadTranslator(job.translator.getAbsolutePath());
                 }
-                if (translatorReady) enqueueFinal(new Object[]{"prepare"});   // in the background, see offerPartial
+                if (translatorReady) enqueue(Job.prepare());   // in the background
                 if (isReady()) listener.onStatus(isListening() ? R.string.status_listening : R.string.status_ready);
                 else listener.onStatus(R.string.status_missing_models);
                 break;
-            }
-            case "unload-live":
-                Native.loadWhisper(Native.LIVE, null);
+            case PREPARE:
+                if (!translatorReady) break;
+                prepare();
+                if (wasAborted()) synchronized (this) {   // stopped for real work: again later, once
+                    boolean queued = false;
+                    for (Job j : queue) queued |= j.kind == Kind.PREPARE;
+                    if (!queued) queue.addLast(Job.prepare());
+                }
                 break;
-            case "prepare":
-                if (translatorReady) prepare();
+            case PARTIAL:
+                if (whisperReady && !job.u.dropped()) pass(job.u, job.pcm, false);
                 break;
-            case "partial":
-                if (whisperReady) pass((Utt) job[1], (float[]) job[2], false);
-                break;
-            case "final": {
-                if (!whisperReady) return;
-                Utt u = (Utt) job[1];
-                float[] pcm = (float[]) job[2];
-                int speechEnd = (Integer) job[3];
-                if (u.lang != null && u.passCovered >= speechEnd && !u.cancelled) {
+            case FINAL: {
+                Utt u = job.u;
+                if (u.dropped()) break;
+                if (!whisperReady) {
+                    discard(u);
+                } else if (u.lang() != null && u.passCovered >= job.speechEnd) {
                     // the last pass already heard all speech: its text is the final one
-                    Log.i(TAG, "final from the last pass (covered " + fmt(u.passCovered) + " of " + fmt(speechEnd) + " speech)");
-                    settleRest(u);
+                    Log.i(TAG, "final from the last pass (covered " + fmt(u.passCovered) + " of " + fmt(job.speechEnd) + " speech)");
+                    for (String piece : u.prevTail) commit(u, piece);
+                    u.prevTail = new ArrayList<>();
                     finish(u);
                 } else {
-                    pass(u, pcm, true);
+                    pass(u, job.pcm, true);
                 }
                 break;
             }
-            case "mt":
-                translatePiece((Utt) job[1], (Integer) job[2], (Lang) job[3]);
+            case MT:
+                translatePiece(job);
                 break;
         }
     }
@@ -635,12 +727,8 @@ final class Engine {
     }
 
     /** Transcribes and cuts the words into sentences (Seg = one sentence with its end time). */
-    private List<Seg> transcribe(int model, Utt u, float[] pcm, Lang lang, String prompt) {
-        return transcribe(model, u, pcm, lang, prompt, false);
-    }
-
-    private List<Seg> transcribe(int model, Utt u, float[] pcm, Lang lang, String prompt, boolean fullCtx) {
-        String out = new String(Native.transcribe(model, pcm, lang.code, prompt, fullCtx), StandardCharsets.UTF_8);
+    private List<Seg> transcribe(Utt u, float[] pcm, Lang lang, String prompt) {
+        String out = new String(Native.transcribe(Native.MAIN, pcm, lang.code, prompt, false), StandardCharsets.UTF_8);
         List<Seg> segs = new ArrayList<>();
         String last = "";
         StringBuilder sentence = new StringBuilder();
@@ -669,13 +757,13 @@ final class Engine {
         // Whisper invents repetitions, mostly of its context or at the padded end of the audio.
         // Drop a sentence already said in this utterance, and one "spoken" impossibly fast.
         java.util.Set<String> said = new java.util.HashSet<>();
-        for (String p : u.pieces) said.add(norm(p));
         List<Seg> kept = new ArrayList<>();
         int prevEnd = 0;
         for (Seg g : segs) {
             int ms = Math.max(1, g.endMs - prevEnd);
             prevEnd = g.endMs;
-            if (!said.add(norm(g.text))) {
+            String n = norm(g.text);
+            if (u.isPiece(n) || !said.add(n)) {
                 Log.i(TAG, "dropped repeat: " + g.text);
                 continue;
             }
@@ -685,8 +773,7 @@ final class Engine {
             }
             kept.add(g);
         }
-        segs = kept;
-        return segs;
+        return kept;
     }
 
     private static String lastWords(String t) {
@@ -711,45 +798,45 @@ final class Engine {
 
     /** One transcription pass over the unsettled audio of an utterance. */
     private void pass(Utt u, float[] pcm, boolean isFinal) {
-        if (u.ended || u.cancelled) return;
         int start = Math.min(u.committedSamples, pcm.length);
         if (pcm.length - start < RATE / 2) {      // nothing new worth transcribing
             if (isFinal) finish(u);
             return;
         }
         float[] audio = Arrays.copyOfRange(pcm, start, pcm.length);
-        String prompt = lastWords(u.committed);
+        String prompt = lastWords(u.committed());
         Lang a = langA, b = langB;
+        Lang lang = u.lang();
         // Transcribe in the likely language first, then check the language on the same audio
         // (accurate right after a transcription) and redo it if it was wrong.
         // Checked once, on the first pass with at least 1 s of audio.
-        Lang guess = u.lang != null ? u.lang : (lastLang == a || lastLang == b) ? lastLang : a;
+        Lang guess = lang != null ? lang : (lastLang == a || lastLang == b) ? lastLang : a;
         long t0 = System.currentTimeMillis();
-        List<Seg> segs = transcribe(Native.MAIN, u, audio, guess, prompt);
+        List<Seg> segs = transcribe(u, audio, guess, prompt);
         if (wasAborted()) {
             Log.i(TAG, "pass over " + fmt(audio.length) + " stopped after " + (System.currentTimeMillis() - t0) + "ms");
             return;
         }
-        if (u.lang == null && (isFinal || pcm.length >= RATE) && !segs.isEmpty()) {
+        if (lang == null && (isFinal || pcm.length >= RATE) && !segs.isEmpty()) {
             Lang detected = Lang.byCode(Native.detectLanguage(Native.MAIN, a.code, b.code), guess);
             if (detected != guess) {
-                segs = transcribe(Native.MAIN, u, audio, detected, prompt);
+                segs = transcribe(u, audio, detected, prompt);
                 if (wasAborted()) return;
             }
-            u.lang = detected;
+            lang = detected;
+            u.setLang(detected, detected == a ? b : a);   // the target is fixed from now on
             lastLang = detected;
         }
-        if (isFinal && u.lang != null) debugDump(u, pcm);
+        if (isFinal && lang != null) debugDump(u, lang, pcm);
         Log.i(TAG, (isFinal ? "final " : "partial ") + fmt(audio.length) + " in " + (System.currentTimeMillis() - t0)
-                + "ms [" + (u.lang == null ? "?" : u.lang.code) + "]: " + joinMarked(segs));
+                + "ms [" + (lang == null ? "?" : lang.code) + "]: " + joinMarked(segs));
 
-        if (u.lang == null) {          // too short to know the language: show a guess, settle nothing
+        if (lang == null) {          // too short to know the language: show a guess, settle nothing
             if (isFinal) {
                 finish(u);
             } else if (!segs.isEmpty()) {
-                u.shownLang = guess;
-                u.tail = join(segs, 0);
-                listener.onUtt(u);
+                u.setGuess(guess, join(segs, 0));
+                emit(u);
             }
             return;
         }
@@ -767,22 +854,27 @@ final class Engine {
                     && ((commit < u.prevTail.size() && norm(segs.get(commit).text).equals(norm(u.prevTail.get(commit))))
                         || segs.get(commit).endMs < audioMs - SETTLED_AFTER_MS)) commit++;
         }
-        Lang target = u.lang == a ? b : a;
-        for (int i = 0; i < commit; i++) {
-            String piece = segs.get(i).text;
-            u.committed = (u.committed + " " + piece).trim();
-            u.pieces.add(piece);
-            enqueueFinal(new Object[]{"mt", u, u.pieces.size() - 1, target});
-        }
+        for (int i = 0; i < commit; i++) commit(u, segs.get(i).text);
         if (commit > 0) {
             u.committedSamples = isFinal ? pcm.length : start + segs.get(commit - 1).endMs * (RATE / 1000);
         }
         u.prevTail = new ArrayList<>();
         for (int i = commit; i < segs.size(); i++) u.prevTail.add(segs.get(i).text);
-        u.tail = join(segs, commit);
+        u.setTail(join(segs, commit));
         u.passCovered = pcm.length;
         if (isFinal) finish(u);
-        else listener.onUtt(u);
+        else emit(u);
+    }
+
+    /** Settles a sentence and queues its translation. */
+    private void commit(Utt u, String piece) {
+        int index = u.addPiece(piece);
+        enqueue(Job.mt(u, index));
+    }
+
+    private void finish(Utt u) {
+        u.finish();
+        emit(u);
     }
 
     /** Keeps the audio of the last 30 utterances in files/debug, to replay what went wrong. */
@@ -792,11 +884,11 @@ final class Engine {
         debugDir = dir;
     }
 
-    private void debugDump(Utt u, float[] pcm) {
+    private void debugDump(Utt u, Lang lang, float[] pcm) {
         if (debugDir == null) return;
         try {
             debugDir.mkdirs();
-            File f = new File(debugDir, String.format(java.util.Locale.ROOT, "utt-%04d-%s.wav", u.id % 10000, u.lang.code));
+            File f = new File(debugDir, String.format(java.util.Locale.ROOT, "utt-%04d-%s.wav", u.id % 10000, lang.code));
             try (java.io.DataOutputStream out = new java.io.DataOutputStream(new java.io.BufferedOutputStream(new java.io.FileOutputStream(f)))) {
                 int bytes = pcm.length * 2;
                 out.writeBytes("RIFF");
@@ -823,84 +915,6 @@ final class Engine {
         }
     }
 
-    /** Settles the unsettled sentences of the last pass, as a final pass would. */
-    private void settleRest(Utt u) {
-        Lang target = u.lang == langA ? langB : langA;
-        for (String piece : u.prevTail) {
-            u.committed = (u.committed + " " + piece).trim();
-            u.pieces.add(piece);
-            enqueueFinal(new Object[]{"mt", u, u.pieces.size() - 1, target});
-        }
-        u.prevTail = new ArrayList<>();
-    }
-
-    /** The utterance is over: drop it if nothing was said, else speak once all is translated. */
-    private void finish(Utt u) {
-        u.ended = true;
-        u.tail = "";
-        if (u.pieces.isEmpty()) {
-            u.dropped = true;
-            listener.onUtt(u);   // lets the UI remove it
-            if (u.next != null) maybeSpeak(u.next);
-            return;
-        }
-        listener.onUtt(u);
-        maybeSpeak(u);
-    }
-
-    /**
-     * Once the speaker stopped, each translated piece is spoken as soon as it is ready, while the
-     * next ones are still being translated (not before: the voice would talk over the speaker).
-     * Utterances are spoken in order: this one waits until the one before it is done.
-     */
-    private void maybeSpeak(Utt u) {
-        synchronized (u) {
-            if (u.recording || u.spoken || u.cancelled || !prevDone(u)) return;
-            while (u.toSpeak < u.translations.size()) {
-                String t = u.translations.get(u.toSpeak++);
-                // its first sentences may have been spoken while it was generated
-                String rest = u.spokenChars == 0 ? t : t.length() >= u.spokenChars ? t.substring(u.spokenChars).trim() : "";
-                u.spokenChars = 0;
-                if (rest.isEmpty()) continue;
-                Log.i(TAG, "speak: " + rest);
-                listener.onTranslated(u, rest);
-            }
-            if (!u.ended || u.toSpeak < u.pieces.size()) return;   // more may come from the final pass
-            u.spoken = true;
-        }
-        if (!isListening()) listener.onStatus(R.string.status_ready);
-        if (u.next != null) maybeSpeak(u.next);
-    }
-
-    private static boolean prevDone(Utt u) {
-        Utt p = u.prev;
-        return p == null || p.spoken || p.dropped || p.cancelled || p.session != u.session;
-    }
-
-    // the end of a sentence followed by more text: ? ! … always; a period only after a word of 3 or
-    // more letters or a digit and before a capital ("z. B.", "Dr. Müller" and "3.5" are not ends)
-    private static final java.util.regex.Pattern SENTENCE_END = java.util.regex.Pattern.compile(
-            "(?:[?!…]|(?<=[^\\s.]{3}|\\d)\\.)[\"»”)]?(?=\\s+[\\p{Lu}¿¡\"«])|[?!…][\"»”)]?(?=\\s+\\S)");
-
-    /**
-     * While the next piece to speak is being translated: speaks its finished sentences right away,
-     * so a long translation does not have to be complete before the voice starts.
-     */
-    private void speakSentences(Utt u, int index, String text) {
-        synchronized (u) {
-            if (u.recording || u.spoken || u.cancelled || u.toSpeak != index || !prevDone(u)) return;
-            java.util.regex.Matcher m = SENTENCE_END.matcher(text);
-            int end = -1;
-            while (m.find()) if (m.end() > u.spokenChars) end = m.end();
-            if (end < 0) return;
-            String say = text.substring(u.spokenChars, end).trim();
-            u.spokenChars = end;
-            if (say.isEmpty()) return;
-            Log.i(TAG, "speak sentence: " + say);
-            listener.onTranslated(u, say);   // inside the lock, so the pieces stay in order
-        }
-    }
-
     /** Reads the translator's fixed instructions for both directions now, not on the first phrase. */
     private void prepare() {
         Lang a = langA, b = langB;
@@ -908,28 +922,35 @@ final class Engine {
         Native.prepareTranslation(a.englishName, a.code, b.englishName, b.targetCode(), generalTranslator);
     }
 
-    private void translatePiece(Utt u, int index, Lang target) {
-        if (!translatorReady || u.cancelled) return;
-        final boolean voseo = target == Lang.ES;
+    private void translatePiece(Job job) {
+        Utt u = job.u;
+        if (u.dropped()) return;
+        Lang from = u.lang(), to = u.target();
+        if (!translatorReady) {
+            u.setTranslation(job.index, "");   // nothing to say, but the utterance is not stuck
+            emit(u);
+            return;
+        }
+        final boolean voseo = to == Lang.ES;
         long t0 = System.currentTimeMillis();
-        byte[] out = Native.translate(u.lang.englishName, u.lang.code, target.englishName, target.targetCode(),
-                u.pieces.get(index), generalTranslator, utf8 -> {
+        byte[] out = Native.translate(from.englishName, from.code, to.englishName, to.targetCode(),
+                u.piece(job.index), generalTranslator, utf8 -> {
                     String s = new String(utf8, StandardCharsets.UTF_8).trim();
-                    u.translating = voseo ? Voseo.apply(s) : s;
-                    listener.onUtt(u);
-                    speakSentences(u, index, u.translating);
+                    u.setTranslating(voseo ? Voseo.apply(s) : s);
+                    emit(u);
                 });
         if (wasAborted()) {
-            u.translating = "";   // runs again later
-            listener.onUtt(u);
+            u.setTranslating("");
+            emit(u);
+            synchronized (this) {
+                if (!u.dropped()) queue.addFirst(job);   // runs again, before anything else
+            }
             return;
         }
         String s = new String(out, StandardCharsets.UTF_8).trim();
         Log.i(TAG, "translation in " + (System.currentTimeMillis() - t0) + "ms: " + s);
-        u.translations.add(voseo ? Voseo.apply(s) : s);
-        u.translating = "";
-        listener.onUtt(u);
-        maybeSpeak(u);
+        u.setTranslation(job.index, voseo ? Voseo.apply(s) : s);
+        emit(u);
     }
 
     private static final java.util.regex.Pattern REPEAT = java.util.regex.Pattern.compile("(.{8,}?)(?:\\s*\\1)+");
@@ -948,6 +969,7 @@ final class Engine {
         if (words.length >= 6 && new java.util.HashSet<>(Arrays.asList(words)).size() * 3 < words.length) return true;
         return l.contains("untertitel") || l.contains("amara.org") || l.contains("zdf") || l.contains("subtítulos")
                 || l.contains("vielen dank fürs zuschauen") || l.contains("gracias por ver")
-                || l.contains("thanks for watching") || l.contains("suscríbete") || l.contains("abonniert") || s.equals("musik") || s.equals("música");
+                || l.contains("thanks for watching") || l.contains("suscríbete") || l.contains("abonniert")
+                || s.equals("musik") || s.equals("música");
     }
 }
