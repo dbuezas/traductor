@@ -31,10 +31,14 @@ final class Engine {
     private static final int CHUNK = RATE / 10;              // 100 ms
     private static final int START_CHUNKS = 2;               // 200 ms of speech starts an utterance
     private static final int PREROLL_CHUNKS = 3;             // keep 300 ms before the start
-    private static final int END_SILENCE_CHUNKS = 8;         // 800 ms of silence ends it
+    // 1.5 s of silence ends it: shorter pauses between sentences stay in one bubble, and the voice
+    // does not start in such a pause (the final pass starts at 300 ms anyway)
+    private static final int END_SILENCE_CHUNKS = 15;
     private static final int MAX_CHUNKS = 200;               // cut very long talk every 20 s
     private static final long FIRST_PARTIAL_MS = 1000;
-    private static final int LONG_UNSETTLED_SAMPLES = RATE * 8;
+    // a pass over this much unsettled audio is not restarted: its settled sentences get translated
+    // while the speaker goes on
+    private static final int LONG_UNSETTLED_SAMPLES = RATE * 4;
     private static final int SILENCE_START_CHUNKS = 3;    // 300 ms quiet: restart with all speech, may become the final
     private static final int SETTLED_AFTER_MS = 1500;
     private static final int MAX_CHARS_PER_SECOND = 30;   // fast speech is ~15-20
@@ -56,6 +60,7 @@ final class Engine {
         volatile String translating = "";
         volatile boolean recording = true;   // audio still coming in
         volatile boolean ended, spoken, dropped;
+        Utt prev, next;   // the utterances before and after, spoken in this order
         int toSpeak;      // translations handed to the voice so far
         int spokenChars;  // of translation number toSpeak: the sentences spoken while it was generated
         volatile boolean cancelled;   // thrown away: its work is skipped
@@ -299,7 +304,7 @@ final class Engine {
                 if (s.turn != null) {             // turn mode: the button decides the end, keep everything
                     if (buf == null) {
                         buf = new FloatBuf();
-                        utt = new Utt(nextId(), s);
+                        utt = link(new Utt(nextId(), s));
                         utt.lang = s.turn;
                         listener.onUtt(utt);
                         lastPartial = System.currentTimeMillis();   // utterance start
@@ -337,7 +342,7 @@ final class Engine {
                         buf = new FloatBuf();
                         for (float[] p : preroll) buf.add(p);
                         preroll.clear();
-                        utt = new Utt(nextId(), s);
+                        utt = link(new Utt(nextId(), s));
                         listener.onUtt(utt);   // shows that someone is being listened to
                         Log.i(TAG, "utt " + utt.id + " start at " + fmt(samplesSeen) + " (rms " + rms + ", noise " + noise + ")");
                         chunks = 0;
@@ -398,6 +403,7 @@ final class Engine {
         u.recording = false;
         listener.onUtt(u);
         enqueueFinal(new Object[]{"final", u, pcm, speechEnd});
+        maybeSpeak(u);   // the speaker stopped: what is translated already can be spoken now
     }
 
     private synchronized int nextId() {
@@ -413,6 +419,17 @@ final class Engine {
         u.dropped = true;
         if (running == u) abortRunning();
         listener.onUtt(u);
+        if (u.next != null) maybeSpeak(u.next);   // it may have been waiting for this one
+    }
+
+    private Utt lastUtt;
+
+    /** Chains a new utterance after the last one, so their translations are spoken in order. */
+    private synchronized Utt link(Utt u) {
+        u.prev = lastUtt;
+        if (lastUtt != null) lastUtt.next = u;
+        lastUtt = u;
+        return u;
     }
 
     private static String fmt(long samples) {
@@ -439,9 +456,14 @@ final class Engine {
 
     private synchronized void enqueueFinal(Object[] job) {
         finals.addLast(job);
-        // a running pass that already heard all the speech is the final one in the making: keep it
-        boolean keep = job[0].equals("final") && stage.equals("partial-asr") && running == job[1]
-                && runningCovers >= (Integer) job[3];
+        // a running pass that already heard all the speech is the final one in the making: keep it.
+        // Also one over long unsettled audio: it settles sentences the voice can start with, and
+        // the final pass then only needs the rest.
+        boolean keep = false;
+        if (job[0].equals("final") && stage.equals("partial-asr") && running == job[1]) {
+            Utt u = (Utt) job[1];
+            keep = runningCovers >= (Integer) job[3] || runningCovers - u.committedSamples > LONG_UNSETTLED_SAMPLES;
+        }
         if ((stage.startsWith("partial") && !keep) || (stage.equals("prepare") && !job[0].equals("prepare"))) {
             abortRunning();
             if (stage.equals("prepare")) requeuePrepare();
@@ -460,34 +482,44 @@ final class Engine {
         pendingPartial = new Object[]{"partial", u, pcm};
         boolean longUnsettled = runningCovers - u.committedSamples > LONG_UNSETTLED_SAMPLES;
         if (stage.equals("partial-asr") && running == u && runningCovers < speechEnd && !longUnsettled) abortRunning();
-        // reading the translator's instructions, or translating, must not delay the voice:
-        // stop it, it runs again later (a translation from the start)
+        // reading the translator's instructions must not delay the voice: stop it, it runs again
+        // later. A translation is not stopped: it is what the voice will say first.
         if (stage.equals("prepare")) {
             abortRunning();
             requeuePrepare();
-        } else if (stage.equals("mt")) {
-            abortRunning();
-            finals.addFirst(runningJob);
         }
         notifyAll();
     }
 
+    private boolean lastWasPass;
+
     /**
-     * The voice goes first: finals (often free, reusing the last pass) and model loading, then a
-     * waiting pass, and only then translations and reading the translator's instructions.
+     * Translations of utterances whose speaker stopped first, then finals (often free, reusing the
+     * last pass) and model loading. Then passes and
+     * translations take turns: while someone talks, the sentences settled so far get translated,
+     * so the voice can start as soon as the speaker stops, and it reads while the rest is done.
      */
     private Object[] nextJob() {
+        // the speaker stopped: the voice needs the sentences settled already, right now; the final
+        // pass for the rest runs while it reads them
+        for (Object[] j : finals) {
+            if (!j[0].equals("mt") || ((Utt) j[1]).recording) continue;
+            finals.remove(j);
+            return j;
+        }
         for (Object[] j : finals) {
             if (j[0].equals("mt") || j[0].equals("prepare")) continue;
             finals.remove(j);
             if (j[0].equals("final") && pendingPartial != null && pendingPartial[1] == j[1]) pendingPartial = null;
             return j;
         }
-        if (pendingPartial != null) {
+        if (pendingPartial != null && (!lastWasPass || finals.isEmpty())) {
             Object[] j = pendingPartial;
             pendingPartial = null;
+            lastWasPass = true;
             return j;
         }
+        lastWasPass = false;
         return finals.removeFirst();
     }
 
@@ -809,6 +841,7 @@ final class Engine {
         if (u.pieces.isEmpty()) {
             u.dropped = true;
             listener.onUtt(u);   // lets the UI remove it
+            if (u.next != null) maybeSpeak(u.next);
             return;
         }
         listener.onUtt(u);
@@ -818,10 +851,11 @@ final class Engine {
     /**
      * Once the speaker stopped, each translated piece is spoken as soon as it is ready, while the
      * next ones are still being translated (not before: the voice would talk over the speaker).
+     * Utterances are spoken in order: this one waits until the one before it is done.
      */
     private void maybeSpeak(Utt u) {
         synchronized (u) {
-            if (!u.ended || u.spoken) return;
+            if (u.recording || u.spoken || u.cancelled || !prevDone(u)) return;
             while (u.toSpeak < u.translations.size()) {
                 String t = u.translations.get(u.toSpeak++);
                 // its first sentences may have been spoken while it was generated
@@ -831,10 +865,16 @@ final class Engine {
                 Log.i(TAG, "speak: " + rest);
                 listener.onTranslated(u, rest);
             }
-            if (u.toSpeak < u.pieces.size()) return;
+            if (!u.ended || u.toSpeak < u.pieces.size()) return;   // more may come from the final pass
             u.spoken = true;
         }
         if (!isListening()) listener.onStatus(R.string.status_ready);
+        if (u.next != null) maybeSpeak(u.next);
+    }
+
+    private static boolean prevDone(Utt u) {
+        Utt p = u.prev;
+        return p == null || p.spoken || p.dropped || p.cancelled || p.session != u.session;
     }
 
     // the end of a sentence followed by more text: ? ! … always; a period only after a word of 3 or
@@ -848,7 +888,7 @@ final class Engine {
      */
     private void speakSentences(Utt u, int index, String text) {
         synchronized (u) {
-            if (!u.ended || u.spoken || u.toSpeak != index) return;
+            if (u.recording || u.spoken || u.cancelled || u.toSpeak != index || !prevDone(u)) return;
             java.util.regex.Matcher m = SENTENCE_END.matcher(text);
             int end = -1;
             while (m.find()) if (m.end() > u.spokenChars) end = m.end();
@@ -908,6 +948,6 @@ final class Engine {
         if (words.length >= 6 && new java.util.HashSet<>(Arrays.asList(words)).size() * 3 < words.length) return true;
         return l.contains("untertitel") || l.contains("amara.org") || l.contains("zdf") || l.contains("subtítulos")
                 || l.contains("vielen dank fürs zuschauen") || l.contains("gracias por ver")
-                || l.contains("thanks for watching") || s.equals("musik") || s.equals("música");
+                || l.contains("thanks for watching") || l.contains("suscríbete") || l.contains("abonniert") || s.equals("musik") || s.equals("música");
     }
 }
