@@ -93,6 +93,10 @@ static int window_for(int n_samples, bool full) {
     return BIG;
 }
 
+// Whisper's retry at a higher temperature when a result looks wrong (repeats, unsure words). Off
+// in the app: each retry runs the decoder again. tools/bench can switch it on to compare.
+static float g_temperature_inc = 0.0f;
+
 // Transcribes and returns one line per word: "<end in ms>\t<word>". The word ends let the
 // caller cut the text into sentences and drop audio whose text is settled.
 // prompt: previous text, for context. full: use the 30 s window (slower, more robust).
@@ -116,7 +120,7 @@ static std::string run_whisper(Whisper &w, const float *pcm, int n, const char *
     p.print_special = false;
     p.print_timestamps = false;
     p.suppress_blank = true;
-    p.temperature_inc = 0.0f;  // no slow retries
+    p.temperature_inc = g_temperature_inc;
     p.audio_ctx = WINDOWS[win];
     p.initial_prompt = prompt && *prompt ? prompt : nullptr;
     p.abort_callback = [](void *) { return g_abort.load(); };

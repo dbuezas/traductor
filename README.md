@@ -5,8 +5,9 @@ lies between them: each one reads their half of the screen (the top half is upsi
 and hears the other person's words translated aloud. Everything runs on the phone, offline.
 
 - Speech to text: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (Whisper large-v3 turbo by default)
-- Translation: [llama.cpp](https://github.com/ggml-org/llama.cpp) with
-  [TranslateGemma](https://huggingface.co/google/translategemma-4b-it) 4B, or a general Gemma 3
+- Translation: [llama.cpp](https://github.com/ggml-org/llama.cpp) with Gemma 3n E2B (the best
+  one I measured on a phone), [TranslateGemma](https://huggingface.co/google/translategemma-4b-it)
+  4B or Gemma 3
 - Text to speech: the phone's own voices
 
 I built it to talk with family in German and Spanish; it also has English, French, Italian,
@@ -55,6 +56,20 @@ the first build (see `app/src/main/cpp/CMakeLists.txt`). It adds:
 Also worth knowing (not patched, worked around in `native.cpp`): after a `whisper_full` call
 with a bigger `audio_ctx`, later calls on the same state with a smaller one produce nonsense. The
 app keeps one whisper state per window size (384, 768, 1500).
+
+Whisper sometimes repeats a sentence, or the whole text ("Hola. Hola."). This is a known Whisper
+problem (more with large-v3 and turbo, with word timestamps and with silence), and the short
+windows make it more frequent. The app drops a repeated sentence and one "spoken" impossibly fast
+(`Engine.segments`). Whisper's own remedy, retrying at a higher temperature when a result looks
+wrong, is off (`temperature_inc = 0`): measured with `tools/bench`, it gives the same quality and is
+slower (turbo 4.3% words wrong both ways; medium 60% → 64% of the speaking time, small 19% → 22%).
+
+## Models
+
+`catalog/models.json` has the precision and speed of each model, measured on a Pixel 7 with
+`tools/bench` (50 German and Spanish sentences of FLEURS). The settings list only the models that
+no other one beats in both precision and speed; the others are behind "show the models that are
+not recommended".
 
 ## Building
 

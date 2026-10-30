@@ -16,7 +16,7 @@
     <string name="section_listen">Luisteren (Whisper)</string>
     <string name="section_translate">Vertalen</string>
     <string name="section_voices">Stemmen</string>
-    <string name="settings_note">Van beste naar slechtste, gemeten op een Pixel 7 (tools/bench in de repo). Tijd: hoe lang een model erover doet, als deel van hoe lang het duurt om de zin te zeggen. Alleen modellen die geen ander tegelijk in nauwkeurigheid en snelheid verslaat staan hier. Modellen worden één keer van Hugging Face gedownload; daarna werkt alles offline.</string>
+    <string name="settings_note">Van beste naar slechtste, gemeten op een Pixel 7 (tools/bench in de repo). Tijd: hoe lang een model erover doet, als deel van hoe lang het duurt om de zin te zeggen. Niet aanbevolen: een ander model is tegelijk nauwkeuriger en sneller. Modellen worden één keer van Hugging Face gedownload; daarna werkt alles offline.</string>
     <string name="choose_model">Kies een model</string>
     <string name="choose_model_hint">Tik om de opties te zien en er een te downloaden.</string>
     <string name="download">Downloaden</string>
@@ -49,4 +49,7 @@
     <string name="bits_full">Ongecomprimeerd: groot en traag.</string>
     <string name="measured_whisper">%1$s%% woorden fout · %2$d%% van de spreektijd</string>
     <string name="measured_translator">chrF %1$s · %2$d%% van de spreektijd</string>
+    <string name="show_hidden">Niet aanbevolen modellen tonen (%d)</string>
+    <string name="hide_hidden">Niet aanbevolen modellen verbergen</string>
+    <string name="measured_ram">%s GB RAM</string>
 </resources>

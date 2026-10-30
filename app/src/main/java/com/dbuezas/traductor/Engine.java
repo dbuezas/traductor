@@ -56,7 +56,8 @@ final class Engine {
         volatile String translating = "";
         volatile boolean recording = true;   // audio still coming in
         volatile boolean ended, spoken, dropped;
-        int toSpeak;   // translations handed to the voice so far
+        int toSpeak;      // translations handed to the voice so far
+        int spokenChars;  // of translation number toSpeak: the sentences spoken while it was generated
         volatile boolean cancelled;   // thrown away: its work is skipped
 
         final Session session;
@@ -822,14 +823,42 @@ final class Engine {
         synchronized (u) {
             if (!u.ended || u.spoken) return;
             while (u.toSpeak < u.translations.size()) {
-                String piece = u.translations.get(u.toSpeak++);
-                Log.i(TAG, "speak: " + piece);
-                listener.onTranslated(u, piece);
+                String t = u.translations.get(u.toSpeak++);
+                // its first sentences may have been spoken while it was generated
+                String rest = u.spokenChars == 0 ? t : t.length() >= u.spokenChars ? t.substring(u.spokenChars).trim() : "";
+                u.spokenChars = 0;
+                if (rest.isEmpty()) continue;
+                Log.i(TAG, "speak: " + rest);
+                listener.onTranslated(u, rest);
             }
             if (u.toSpeak < u.pieces.size()) return;
             u.spoken = true;
         }
         if (!isListening()) listener.onStatus(R.string.status_ready);
+    }
+
+    // the end of a sentence followed by more text: ? ! … always; a period only after a word of 3 or
+    // more letters or a digit and before a capital ("z. B.", "Dr. Müller" and "3.5" are not ends)
+    private static final java.util.regex.Pattern SENTENCE_END = java.util.regex.Pattern.compile(
+            "(?:[?!…]|(?<=[^\\s.]{3}|\\d)\\.)[\"»”)]?(?=\\s+[\\p{Lu}¿¡\"«])|[?!…][\"»”)]?(?=\\s+\\S)");
+
+    /**
+     * While the next piece to speak is being translated: speaks its finished sentences right away,
+     * so a long translation does not have to be complete before the voice starts.
+     */
+    private void speakSentences(Utt u, int index, String text) {
+        synchronized (u) {
+            if (!u.ended || u.spoken || u.toSpeak != index) return;
+            java.util.regex.Matcher m = SENTENCE_END.matcher(text);
+            int end = -1;
+            while (m.find()) if (m.end() > u.spokenChars) end = m.end();
+            if (end < 0) return;
+            String say = text.substring(u.spokenChars, end).trim();
+            u.spokenChars = end;
+            if (say.isEmpty()) return;
+            Log.i(TAG, "speak sentence: " + say);
+            listener.onTranslated(u, say);   // inside the lock, so the pieces stay in order
+        }
     }
 
     /** Reads the translator's fixed instructions for both directions now, not on the first phrase. */
@@ -848,6 +877,7 @@ final class Engine {
                     String s = new String(utf8, StandardCharsets.UTF_8).trim();
                     u.translating = voseo ? Voseo.apply(s) : s;
                     listener.onUtt(u);
+                    speakSentences(u, index, u.translating);
                 });
         if (wasAborted()) {
             u.translating = "";   // runs again later

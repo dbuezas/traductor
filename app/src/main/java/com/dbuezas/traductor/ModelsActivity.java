@@ -84,6 +84,7 @@ public class ModelsActivity extends Activity {
     }
 
     private final java.util.Set<Models.Kind> open = new java.util.HashSet<>();   // sections showing all options
+    private final java.util.Set<Models.Kind> showHidden = new java.util.HashSet<>();   // also the not recommended ones
 
     private void render() {
         list.removeAllViews();
@@ -133,11 +134,26 @@ public class ModelsActivity extends Activity {
         list.addView(box, lp);
 
         if (!expanded) return;
+        int hidden = 0;
         for (Models.Model m : Models.catalog) {
             if (m.kind != kind) continue;
-            // a model another one beats in quality and speed: only if it is on the phone already
-            if (m.hidden && !Models.isDownloaded(this, m) && !Models.isDownloading(m)) continue;
+            // a model another one beats in quality and speed: only if it is on the phone already,
+            // or when asked for
+            if (m.hidden && !showHidden.contains(kind) && !Models.isDownloaded(this, m) && !Models.isDownloading(m)) {
+                hidden++;
+                continue;
+            }
             row(m);
+        }
+        if (hidden > 0 || showHidden.contains(kind)) {
+            TextView t = Ui.text(this, showHidden.contains(kind) ? getString(R.string.hide_hidden)
+                    : getString(R.string.show_hidden, hidden), 14, Ui.A, true);
+            t.setPadding(dp(16), dp(14), dp(16), dp(6));
+            t.setOnClickListener(v -> {
+                if (!showHidden.remove(kind)) showHidden.add(kind);
+                render();
+            });
+            list.addView(t);
         }
         // found on Hugging Face, not tested by me
         boolean any = false;
@@ -268,8 +284,11 @@ public class ModelsActivity extends Activity {
     private TextView ratings(Models.Model m) {
         String s = !m.tested() ? getString(R.string.untested)
                 : getString(R.string.precision) + " " + dots(m.precision) + "    " + getString(R.string.speed) + " " + dots(m.speed);
-        if (m.quality > 0) s += "\n" + getString(m.kind == Models.Kind.WHISPER ? R.string.measured_whisper : R.string.measured_translator,
-                String.format(java.util.Locale.getDefault(), "%.1f", m.quality), m.time);
+        if (m.quality > 0) {
+            s += "\n" + getString(m.kind == Models.Kind.WHISPER ? R.string.measured_whisper : R.string.measured_translator,
+                    String.format(java.util.Locale.getDefault(), "%.1f", m.quality), m.time);
+            if (m.ram > 0) s += " · " + getString(R.string.measured_ram, String.format(java.util.Locale.getDefault(), "%.1f", m.ram / 1000.0));
+        }
         TextView t = Ui.text(this, s, 13, Ui.MUTED, true);
         t.setPadding(0, dp(3), 0, dp(1));
         return t;

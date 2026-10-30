@@ -36,10 +36,11 @@ final class Models {
         final int precision, speed;   // 1..5; 0 = not tested
         final double quality;         // measured: Whisper % of words wrong, translator chrF; 0 = not measured
         final int time;               // measured: % of the speaking time
+        final int ram;                // measured: MB of memory used; 0 = not measured
         final boolean hidden;         // another model is better and faster: listed only once downloaded
 
         Model(String id, Kind kind, String label, Map<String, String> notes, String url, long size, boolean general,
-              int precision, int speed, double quality, int time, boolean hidden) {
+              int precision, int speed, double quality, int time, int ram, boolean hidden) {
             this.id = id;
             this.kind = kind;
             this.label = label;
@@ -51,6 +52,7 @@ final class Models {
             this.speed = speed;
             this.quality = quality;
             this.time = time;
+            this.ram = ram;
             this.hidden = hidden;
         }
 
@@ -138,7 +140,7 @@ final class Models {
             out.add(new Model(o.getString("id"), o.getString("kind").equals("whisper") ? Kind.WHISPER : Kind.TRANSLATOR,
                     o.getString("label"), notes, o.getString("url"), o.getLong("size"), o.optBoolean("general"),
                     o.optInt("precision"), o.optInt("speed"), o.optDouble("quality", 0), o.optInt("time"),
-                    o.optBoolean("hidden")));
+                    o.optInt("ram"), o.optBoolean("hidden")));
         }
         return out;
     }

@@ -1,7 +1,9 @@
 // Runs the app's own native code (app/src/main/cpp/native.cpp) on a list of test sentences, on
 // the phone through adb, and prints the results with the time each one took. See README.md.
 //
-//   bench whisper <model.bin> <list>       list lines: id \t lang \t file.wav (16 kHz mono)
+//   bench whisper <model.bin> <list> [temperature_inc]
+//                                          list lines: id \t lang \t file.wav (16 kHz mono);
+//                                          temperature_inc > 0 switches on whisper's retries
 //   bench translate <model.gguf> <general 0/1> <list>
 //                                          list lines: id \t source lang \t target lang \t text
 // Output lines: id \t ms \t text, and at the end "#ram \t MB"; for whisper also \t the raw "<end ms>\t<word>" lines joined
@@ -53,7 +55,8 @@ static const std::map<std::string, std::string> NAMES = {
 
 int main(int argc, char **argv) {
     const std::string mode = argc > 1 ? argv[1] : "";
-    if (mode == "whisper" && argc == 4) {
+    if (mode == "whisper" && (argc == 4 || argc == 5)) {
+        if (argc == 5) g_temperature_inc = std::stof(argv[4]);
         double t = now_ms();
         if (!load_whisper(0, argv[2])) return fprintf(stderr, "cannot load %s\n", argv[2]), 1;
         fprintf(stderr, "loaded in %.0f ms\n", now_ms() - t);

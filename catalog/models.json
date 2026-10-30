@@ -192,7 +192,8 @@
       },
       "quality": 49.3,
       "time": 96,
-      "hidden": true
+      "hidden": true,
+      "ram": 4253
     },
     {
       "id": "gemma-3n-E2B-it-GGUF_gemma-3n-E2B-it-Q6_K.gguf",
@@ -228,7 +229,8 @@
       },
       "quality": 49.0,
       "time": 130,
-      "hidden": true
+      "hidden": true,
+      "ram": 3408
     },
     {
       "id": "translategemma-4b-it-Q5_K_M.gguf",
@@ -249,7 +251,8 @@
       },
       "quality": 49.0,
       "time": 108,
-      "hidden": true
+      "hidden": true,
+      "ram": 3065
     },
     {
       "id": "translategemma-4b-it-Q5_K_S.gguf",
@@ -270,7 +273,8 @@
       },
       "quality": 48.8,
       "time": 103,
-      "hidden": true
+      "hidden": true,
+      "ram": 3002
     },
     {
       "id": "gemma-3-4b-it-Q8_0.gguf",
@@ -292,7 +296,8 @@
       },
       "quality": 48.5,
       "time": 101,
-      "hidden": true
+      "hidden": true,
+      "ram": 4245
     },
     {
       "id": "gemma-3-4b-it-GGUF_gemma-3-4b-it-Q5_K_M.gguf",
@@ -343,7 +348,8 @@
       },
       "quality": 48.1,
       "time": 83,
-      "hidden": true
+      "hidden": true,
+      "ram": 2634
     },
     {
       "id": "translategemma-4b-it-Q3_K_L.gguf",
@@ -364,7 +370,8 @@
       },
       "quality": 48.1,
       "time": 102,
-      "hidden": true
+      "hidden": true,
+      "ram": 2498
     },
     {
       "id": "translategemma-4b-it-Q4_K_M.gguf",
@@ -385,7 +392,8 @@
       },
       "quality": 47.9,
       "time": 91,
-      "hidden": true
+      "hidden": true,
+      "ram": 2741
     },
     {
       "id": "gemma-3-4b-it-Q4_K_M.gguf",
@@ -407,7 +415,8 @@
       },
       "quality": 47.7,
       "time": 87,
-      "hidden": true
+      "hidden": true,
+      "ram": 2733
     },
     {
       "id": "gemma-3-4b-it-qat-GGUF_gemma-3-4b-it-qat-Q4_0.gguf",
@@ -444,7 +453,8 @@
       },
       "quality": 41.8,
       "time": 28,
-      "hidden": true
+      "hidden": true,
+      "ram": 905
     },
     {
       "id": "gemma-3-1b-it-Q8_0.gguf",
@@ -466,7 +476,8 @@
       },
       "quality": 40.6,
       "time": 23,
-      "hidden": true
+      "hidden": true,
+      "ram": 1156
     },
     {
       "id": "gemma-3-270m-it-GGUF_gemma-3-270m-it-Q8_0.gguf",
@@ -480,7 +491,8 @@
       "time": 5,
       "precision": 1,
       "speed": 5,
-      "hidden": true
+      "hidden": true,
+      "ram": 395
     }
   ]
 }
