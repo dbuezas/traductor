@@ -1,5 +1,6 @@
 // JNI bridge: whisper.cpp for speech-to-text, llama.cpp + TranslateGemma for translation.
-// All calls come from one Java worker thread, so there is no locking here.
+// All calls come from one Java worker thread, so there is no locking here. The work is done in
+// plain C++ functions (also used by tools/bench); the JNI functions only convert the arguments.
 
 #include <jni.h>
 #include <android/log.h>
@@ -163,17 +164,17 @@ static void free_whisper(Whisper &w) {
     w = Whisper();
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_dbuezas_traductor_Native_loadWhisper(JNIEnv *env, jclass, jint slot, jstring path) {
+// path empty: just unload
+static bool load_whisper(int slot, const std::string &path) {
     pin_to_fast_cores();
     Whisper &w = g_whisper[slot];
     free_whisper(w);
-    if (!path) return JNI_FALSE;   // just unload
+    if (path.empty()) return false;
     whisper_context_params cp = whisper_context_default_params();
     cp.use_gpu = false;
     cp.flash_attn = true;   // same speed here, and the encoder buffer shrinks from 212 to 55 MB
-    w.ctx = whisper_init_from_file_with_params_no_state(jstr(env, path).c_str(), cp);
-    if (!w.ctx) return JNI_FALSE;
+    w.ctx = whisper_init_from_file_with_params_no_state(path.c_str(), cp);
+    if (!w.ctx) return false;
     // warm-up of the small windows: creates their states and compute buffers now, not on the
     // first real phrase
     for (float seconds : {2.0f, 8.0f}) {
@@ -182,9 +183,23 @@ Java_com_dbuezas_traductor_Native_loadWhisper(JNIEnv *env, jclass, jint slot, js
     }
     if (!w.states[0]) {
         free_whisper(w);
-        return JNI_FALSE;
+        return false;
     }
-    return JNI_TRUE;
+    return true;
+}
+
+static std::string transcribe(int slot, const float *pcm, int n, const std::string &lang, const std::string &prompt, bool full) {
+    pin_to_fast_cores();
+    Whisper &w = g_whisper[slot];
+    if (!w.ctx) return "";
+    // the big-window state of the previous call was kept for its language detection: free it now
+    if (window_for(n, full) != BIG) release_big_state(w);
+    return run_whisper(w, pcm, n, lang.c_str(), prompt.c_str(), full);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_dbuezas_traductor_Native_loadWhisper(JNIEnv *env, jclass, jint slot, jstring path) {
+    return load_whisper(slot, jstr(env, path));
 }
 
 // Returns whichever of langA / langB whisper thinks is more likely for the audio of the last
@@ -205,15 +220,9 @@ Java_com_dbuezas_traductor_Native_detectLanguage(JNIEnv *env, jclass, jint slot,
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_dbuezas_traductor_Native_transcribe(JNIEnv *env, jclass, jint slot, jfloatArray pcm, jstring lang, jstring prompt,
                                              jboolean fullCtx) {
-    pin_to_fast_cores();
-    Whisper &w = g_whisper[slot];
-    if (!w.ctx) return jbytes(env, "");
-    const std::string l = jstr(env, lang), pr = jstr(env, prompt);
     const int n = env->GetArrayLength(pcm);
     float *data = env->GetFloatArrayElements(pcm, nullptr);
-    // the big-window state of the previous call was kept for its language detection: free it now
-    if (window_for(n, fullCtx) != BIG) release_big_state(w);
-    std::string text = run_whisper(w, data, n, l.c_str(), pr.c_str(), fullCtx);
+    std::string text = transcribe(slot, data, n, jstr(env, lang), jstr(env, prompt), fullCtx);
     env->ReleaseFloatArrayElements(pcm, data, JNI_ABORT);
     return jbytes(env, text);
 }
@@ -332,8 +341,7 @@ Java_com_dbuezas_traductor_Native_prepareTranslation(JNIEnv *env, jclass, jstrin
     ensure_prefix(make_prefix(jstr(env, jsrcName), jstr(env, jsrcCode), jstr(env, jtgtName), jstr(env, jtgtCode), general));
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_dbuezas_traductor_Native_loadTranslator(JNIEnv *env, jclass, jstring path) {
+static bool load_translator(const std::string &path) {
     pin_to_fast_cores();
     llama_backend_init();
     if (g_smpl) llama_sampler_free(g_smpl);
@@ -344,14 +352,14 @@ Java_com_dbuezas_traductor_Native_loadTranslator(JNIEnv *env, jclass, jstring pa
     g_prefix_text[0].clear();
     g_prefix_text[1].clear();
 
-    g_model_path = jstr(env, path);
+    g_model_path = path;
     llama_model_params mp = llama_model_default_params();
     // Keep the weights in the memory-mapped file instead of a repacked copy on the heap. Reading
     // the prompt gets ~2x slower (the long instruction part is cached anyway), generating stays
     // as fast, and 2.4 GB stay out of the heap, where Android would squeeze them into swap.
     mp.use_extra_bufts = false;
-    g_model = llama_model_load_from_file(jstr(env, path).c_str(), mp);
-    if (!g_model) return JNI_FALSE;
+    g_model = llama_model_load_from_file(path.c_str(), mp);
+    if (!g_model) return false;
     g_vocab = llama_model_get_vocab(g_model);
 
     llama_context_params cp = llama_context_default_params();
@@ -363,44 +371,39 @@ Java_com_dbuezas_traductor_Native_loadTranslator(JNIEnv *env, jclass, jstring pa
     cp.kv_unified = true;  // the work sequence shares the cached prefix cells
     cp.swa_full = true;    // Gemma 3 sliding-window cache must keep the whole prefix to copy it
     g_lctx = llama_init_from_model(g_model, cp);
-    if (!g_lctx) return JNI_FALSE;
+    if (!g_lctx) return false;
     llama_set_abort_callback(g_lctx, abort_cb, nullptr);
 
     g_smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(g_smpl, llama_sampler_init_greedy());
-    return JNI_TRUE;
+    return true;
 }
 
-// Translates text. Calls listener.onPartial(byte[] utf8SoFar) as tokens arrive; returns the
-// full UTF-8 result. Bytes (not String) because a token can end in the middle of a character.
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_dbuezas_traductor_Native_translate(JNIEnv *env, jclass, jstring jsrcName, jstring jsrcCode,
-                                            jstring jtgtName, jstring jtgtCode, jstring jtext, jboolean general,
-                                            jobject listener) {
-    pin_to_fast_cores();
-    if (!g_lctx) return jbytes(env, "");
-    const std::string S = jstr(env, jsrcName), s = jstr(env, jsrcCode);
-    const std::string T = jstr(env, jtgtName), t = jstr(env, jtgtCode);
-    const std::string text = jstr(env, jtext);
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_dbuezas_traductor_Native_loadTranslator(JNIEnv *env, jclass, jstring path) {
+    return load_translator(jstr(env, path));
+}
 
+// Translates text. Calls on_partial(utf8 so far) as tokens arrive; returns the full UTF-8 result.
+static std::string translate(const std::string &S, const std::string &s, const std::string &T, const std::string &t,
+                             const std::string &text, bool general, const std::function<void(const std::string &)> &on_partial) {
+    pin_to_fast_cores();
+    if (!g_lctx) return "";
     const std::string prefix = make_prefix(S, s, T, t, general);
 
     llama_memory_t mem = llama_get_memory(g_lctx);
     llama_memory_seq_rm(mem, WORK_SEQ, -1, -1);
 
     const int slot = ensure_prefix(prefix);
-    if (slot < 0) return jbytes(env, "");
+    if (slot < 0) return "";
     llama_memory_seq_cp(mem, slot, WORK_SEQ, -1, -1);
     int pos = g_prefix_len[slot];
 
     auto toks = tokenize(text, false, false);
     auto tail = tokenize("<end_of_turn>\n<start_of_turn>model\n", false, true);
     toks.insert(toks.end(), tail.begin(), tail.end());
-    if (!eval(toks, pos, WORK_SEQ, true)) return jbytes(env, "");
+    if (!eval(toks, pos, WORK_SEQ, true)) return "";
     pos += (int) toks.size();
-
-    jclass cls = env->GetObjectClass(listener);
-    jmethodID onPartial = env->GetMethodID(cls, "onPartial", "([B)V");
 
     std::string out;
     const int max_tokens = 256;
@@ -411,11 +414,24 @@ Java_com_dbuezas_traductor_Native_translate(JNIEnv *env, jclass, jstring jsrcNam
         char buf[256];
         int n = llama_token_to_piece(g_vocab, tok, buf, sizeof(buf), 0, false);
         if (n > 0) out.append(buf, n);
-        jbyteArray arr = jbytes(env, out);
-        env->CallVoidMethod(listener, onPartial, arr);
-        env->DeleteLocalRef(arr);
+        on_partial(out);
         if (!eval({tok}, pos++, WORK_SEQ, true)) break;
     }
     llama_memory_seq_rm(mem, WORK_SEQ, -1, -1);
-    return jbytes(env, out);
+    return out;
+}
+
+// listener.onPartial(byte[] utf8SoFar) as tokens arrive. Bytes (not String) because a token can
+// end in the middle of a character.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_dbuezas_traductor_Native_translate(JNIEnv *env, jclass, jstring jsrcName, jstring jsrcCode,
+                                            jstring jtgtName, jstring jtgtCode, jstring jtext, jboolean general,
+                                            jobject listener) {
+    jmethodID onPartial = env->GetMethodID(env->GetObjectClass(listener), "onPartial", "([B)V");
+    return jbytes(env, translate(jstr(env, jsrcName), jstr(env, jsrcCode), jstr(env, jtgtName), jstr(env, jtgtCode),
+                                 jstr(env, jtext), general, [&](const std::string &out) {
+        jbyteArray arr = jbytes(env, out);
+        env->CallVoidMethod(listener, onPartial, arr);
+        env->DeleteLocalRef(arr);
+    }));
 }
