@@ -274,13 +274,15 @@ public class MainActivity extends Activity implements Engine.Listener, Speaker.H
             view.addView(text, new LinearLayout.LayoutParams(-2, -2));
             LinearLayout footer = new LinearLayout(MainActivity.this);
             footer.setGravity(Gravity.CENTER_VERTICAL);
+            // the gap above goes here, not as the button's top margin: a centered child is moved
+            // down by its margin once more and stuck out at the bottom, cut off
+            footer.setPadding(0, dp(6), 0, 0);
             meta.setPadding(0, dp(2), 0, 0);
             // no weight here: inside a wrap_content bubble a weighted child gets no width
             footer.addView(meta, new LinearLayout.LayoutParams(-2, -2));
             play.setPadding(dp(7), dp(7), dp(7), dp(7));
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(34), dp(34));
             plp.leftMargin = dp(10);
-            plp.topMargin = dp(4);
             footer.addView(play, plp);
             view.addView(footer, new LinearLayout.LayoutParams(-2, -2));
         }
