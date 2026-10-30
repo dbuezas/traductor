@@ -821,7 +821,11 @@ final class Engine {
     private void maybeSpeak(Utt u) {
         synchronized (u) {
             if (!u.ended || u.spoken) return;
-            while (u.toSpeak < u.translations.size()) listener.onTranslated(u, u.translations.get(u.toSpeak++));
+            while (u.toSpeak < u.translations.size()) {
+                String piece = u.translations.get(u.toSpeak++);
+                Log.i(TAG, "speak: " + piece);
+                listener.onTranslated(u, piece);
+            }
             if (u.toSpeak < u.pieces.size()) return;
             u.spoken = true;
         }
