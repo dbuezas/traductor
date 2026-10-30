@@ -202,7 +202,15 @@
       "url": "https://huggingface.co/unsloth/gemma-3n-E2B-it-GGUF/resolve/main/gemma-3n-E2B-it-Q6_K.gguf",
       "size": 4208594272,
       "general": true,
-      "note": {},
+      "note": {
+        "en": "Like Q5_K_M, but bigger and slower. Speaks Rioplatense Spanish (\"vos\").",
+        "es": "Como Q5_K_M, pero más grande y más lento. Habla con \"vos\".",
+        "de": "Wie Q5_K_M, aber größer und langsamer. Spricht argentinisches Spanisch („vos“).",
+        "fr": "Comme Q5_K_M, mais plus gros et plus lent. Parle l’espagnol du Río de la Plata (« vos »).",
+        "it": "Come Q5_K_M, ma più grande e più lento. Parla spagnolo rioplatense (\"vos\").",
+        "pt": "Como o Q5_K_M, mas maior e mais lento. Fala espanhol rioplatense (\"vos\").",
+        "nl": "Zoals Q5_K_M, maar groter en trager. Spreekt Rioplatense Spaans (\"vos\")."
+      },
       "quality": 49.3,
       "time": 88,
       "ram": 3735,
