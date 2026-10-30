@@ -19,42 +19,60 @@ final class Discovery {
     private static final String API = "https://huggingface.co/api/models";
     private static final Set<String> TRUSTED = Set.of("ggml-org", "ggerganov", "google", "bartowski", "unsloth",
             "lmstudio-community", "bullerwins", "mradermacher");
-    // model families the app's llama.cpp runs with a Gemma prompt; small enough for a phone
+    // the original models only (not "abliterated", "i1", "text" or other changed versions), as the
+    // family name and whether it is a QAT version (trained for 4 bits)
     private static final Pattern TRANSLATOR_REPO = Pattern.compile(
-            "(?i)[^/]+/([a-z]+_)?(translategemma-4b|gemma-3-(270m|1b|4b)|gemma-3n-e[24]b)-it\\b.*gguf.*");
+            "(?i)[^/]+/(?:google_)?(translategemma-4b|gemma-3-(?:270m|1b|4b)|gemma-3n-e[24]b)-it(-qat)?(?:-q4_0)?-gguf");
     private static final long MAX_SIZE = 4_500_000_000L;
-    private static final Pattern TOO_SMALL = Pattern.compile("(?i)IQ1|IQ2|Q2_K|IQ3_XXS");
+    // the compressions that are really different; the others are about the same as one of these, or worse
+    private static final Pattern QUANT = Pattern.compile("(?i)[-._](Q4_K_M|Q5_K_M|Q6_K|Q8_0)\\.gguf");
+    private static final Pattern QAT_QUANT = Pattern.compile("(?i)[-._](Q4_0)\\.gguf");
 
-    /** Models not in the catalog, as catalog JSON entries without precision/speed/notes. */
+    /**
+     * Models not in the catalog, as catalog JSON entries without precision/speed/notes. Per model
+     * only the most downloaded publisher, and per publisher only a few compressions.
+     */
     static JSONArray search(List<Models.Model> catalog) throws Exception {
-        Set<String> known = new HashSet<>();
-        for (Models.Model m : catalog) known.add(m.url);
+        Set<String> known = new HashSet<>();   // urls, and "family quant" of what is listed already
+        for (Models.Model m : catalog) {
+            known.add(m.url);
+            String k = key(m.url);
+            if (k != null) known.add(k);
+        }
         JSONArray out = new JSONArray();
 
-        // Whisper: multilingual ggml files of whisper.cpp (".en" ones only know English)
+        // Whisper: q8 versions of the multilingual whisper.cpp models (q5 is slow on phones, the full
+        // ones are twice the size for the same quality, large v1/v2 are older versions of v3)
         for (Object[] f : files("ggerganov/whisper.cpp")) {
             String name = (String) f[0];
-            if (!name.matches("ggml-[a-z0-9.-]+\\.bin") || name.contains(".en") || name.contains("encoder")) continue;
+            if (!name.matches("ggml-[a-z0-9.-]+-q8_0\\.bin") || name.contains(".en") || name.matches(".*large-v[12].*")) continue;
             add(out, known, "ggerganov/whisper.cpp", name, (Long) f[1], "whisper",
                     "Whisper " + name.replace("ggml-", "").replace(".bin", ""), false);
         }
 
-        // translators
-        Set<String> repos = new HashSet<>();
+        // translators: the API lists the most downloaded repos first; the first one per family wins
+        Set<String> families = new HashSet<>();
+        java.util.List<String> repos = new java.util.ArrayList<>();
         for (String q : new String[]{"translategemma", "gemma-3"}) {
-            JSONArray found = new JSONArray(Models.read(new URL(API + "?search=" + q + "&filter=gguf&limit=200").openStream()));
+            JSONArray found = new JSONArray(Models.read(new URL(API + "?search=" + q + "&filter=gguf&sort=downloads&limit=200").openStream()));
             for (int i = 0; i < found.length(); i++) {
                 String id = found.getJSONObject(i).getString("id");
-                if (TRUSTED.contains(id.substring(0, id.indexOf('/'))) && TRANSLATOR_REPO.matcher(id).matches()) repos.add(id);
+                java.util.regex.Matcher m = TRANSLATOR_REPO.matcher(id);
+                if (!TRUSTED.contains(id.substring(0, id.indexOf('/'))) || !m.matches()) continue;
+                if (families.add(m.group(1).toLowerCase() + (m.group(2) != null ? "-qat" : ""))) repos.add(id);
             }
         }
         for (String repo : repos) {
             boolean general = !repo.toLowerCase().contains("translategemma");
+            boolean qat = repo.toLowerCase().contains("-qat");
             String author = repo.substring(0, repo.indexOf('/'));
             for (Object[] f : files(repo)) {
                 String name = (String) f[0];
-                if (!name.endsWith(".gguf") || name.contains("mmproj") || name.contains("/")) continue;
-                if (TOO_SMALL.matcher(name).find()) continue;   // 1-2 bit versions: too damaged to translate
+                if (name.contains("/") || !(qat ? QAT_QUANT : QUANT).matcher(name).find()) continue;
+                // 270M is so small that the full 8 bits cost almost nothing more
+                if (repo.contains("270m") && !name.contains("Q8_0")) continue;
+                String k = key("https://huggingface.co/" + repo + "/resolve/main/" + name);
+                if (k != null && !known.add(k)) continue;   // same model and compression as one listed already
                 add(out, known, repo, name, (Long) f[1], "translator",
                         name.replace(".gguf", "") + " · " + author, general);
             }
@@ -64,6 +82,15 @@ final class Discovery {
         for (int i = 0; i < out.length(); i++) sorted.add(out.getJSONObject(i));
         sorted.sort((a, b) -> a.optString("label").compareToIgnoreCase(b.optString("label")));
         return new JSONArray(sorted);
+    }
+
+    /** "gemma-3-4b Q4_K_M" for a translator file url, so the same file from two publishers counts once. */
+    private static String key(String url) {
+        String repo = url.replaceFirst("https://huggingface.co/([^/]+/[^/]+)/.*", "$1");
+        java.util.regex.Matcher r = TRANSLATOR_REPO.matcher(repo);
+        java.util.regex.Matcher q = Pattern.compile("(?i)[-._](Q\\d_\\w+?)\\.gguf$").matcher(url);
+        if (!r.matches() || !q.find()) return null;
+        return r.group(1).toLowerCase() + (r.group(2) != null ? "-qat" : "") + " " + q.group(1).toUpperCase();
     }
 
     private static void add(JSONArray out, Set<String> known, String repo, String file, long size, String kind,
