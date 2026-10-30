@@ -226,6 +226,30 @@ public class MainActivity extends Activity implements Engine.Listener {
         }
     }
 
+    /** A sentence still to come: a rounded bar about as long as a short word. */
+    private static final class BarSpan extends android.text.style.ReplacementSpan {
+        final int color;
+
+        BarSpan(int color) {
+            this.color = color;
+        }
+
+        @Override
+        public int getSize(android.graphics.Paint paint, CharSequence t, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
+            return Math.round(paint.getTextSize() * 2.2f);
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c, CharSequence t, int start, int end, float x, int top, int y, int bottom,
+                         android.graphics.Paint paint) {
+            float h = paint.getTextSize() * 0.42f, mid = y - paint.getTextSize() * 0.32f;
+            int old = paint.getColor();
+            paint.setColor(color);
+            c.drawRoundRect(x, mid - h / 2, x + getSize(paint, t, start, end, null), mid + h / 2, h / 2, h / 2, paint);
+            paint.setColor(old);
+        }
+    }
+
     /** One chat bubble: the text, and a small line saying what is still happening to it. */
     private final class Bubble {
         final LinearLayout view = new LinearLayout(MainActivity.this);
@@ -275,7 +299,9 @@ public class MainActivity extends Activity implements Engine.Listener {
             view.setBackground(shape);
             setGravity(mine ? Gravity.END : Gravity.START);
 
-            // settled text solid, text that may still change faded
+            // settled text solid, text that may still change faded; then, where the text will
+            // continue: a bar for each sentence heard but not translated yet, and "…" while
+            // there is audio still to transcribe
             String settled = mine ? u.committed : u.translationDone();
             String pending = mine ? u.tail : u.translating;
             SpannableStringBuilder s = new SpannableStringBuilder(settled);
@@ -283,6 +309,21 @@ public class MainActivity extends Activity implements Engine.Listener {
                 if (s.length() > 0) s.append(' ');
                 int from = s.length();
                 s.append(pending);
+                s.setSpan(new ForegroundColorSpan(pendingFg), from, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            if (!mine) {
+                int queued = u.pieces.size() - u.translations.size() - (u.translating.isEmpty() ? 0 : 1);
+                for (int i = 0; i < queued; i++) {
+                    if (s.length() > 0) s.append(' ');
+                    int from = s.length();
+                    s.append('\u2003');   // a placeholder character, drawn as a bar
+                    s.setSpan(new BarSpan(pendingFg), from, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+            }
+            boolean moreToHear = !u.ended && (mine ? !u.recording : true);
+            if (moreToHear && s.length() > 0) {
+                int from = s.length();
+                s.append(" …");
                 s.setSpan(new ForegroundColorSpan(pendingFg), from, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
             text.setText(s);
